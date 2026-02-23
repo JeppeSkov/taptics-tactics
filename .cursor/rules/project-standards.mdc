@@ -1,0 +1,26 @@
+---
+description: Project standards for Taptics Lineup Builder
+alwaysApply: true
+---
+
+# Project standards
+
+## Change strategy
+- Prefer minimal, surgical changes over refactors.
+- If a refactor would help, propose it first and wait for approval.
+
+## React + TypeScript
+- Follow React best practices (functional components, hooks, predictable state).
+- Keep components readable: extract helpers/hooks when logic grows.
+- Avoid unnecessary re-renders (e.g., memoize derived data / handlers when it matters), but don’t over-optimize.
+
+## UI/UX + accessibility
+- Prioritize clarity and usability.
+- Include accessible labels, keyboard navigation where relevant, and sensible focus behavior.
+- Don’t introduce UI that is visually “correct” but hard to use.
+
+## Dependencies
+- If dependency changes are needed (add/update/remove), propose the exact change and why, and ask before applying.
+
+## Safety checkpoints (recommended)
+- Before large changes, recommend creating a checkpoint (ideally a git commit) so rollback is easy.
