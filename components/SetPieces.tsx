@@ -6,10 +6,10 @@ import { Pitch, PitchArrow, PitchZone, PitchOpponent } from './Pitch';
 import { SetPieceSharedView, SharedSetPiecePayload } from './SetPieceSharedView';
 import { Player, TacticalSlot } from '../types';
 import { STORAGE_KEY } from '../constants';
-import { Flag, Users, Trash2, Palette, ChevronDown, CornerUpRight, Shield, MoveRight, User, CircleDashed, ClipboardEdit, Save, Play, Clock, Layout, X, AlertTriangle, Check, RefreshCw, Plus, Share2, Copy, Link as LinkIcon, ZoomIn, ZoomOut, Eye } from 'lucide-react';
+import { Flag, Users, Trash2, Palette, ChevronDown, CornerUpRight, Shield, MoveRight, User, CircleDashed, ClipboardEdit, Save, Play, Clock, Layout, X, AlertTriangle, Check, RefreshCw, Plus, Share2, Copy, Link as LinkIcon, ZoomIn, ZoomOut, Eye, Send, Undo2 } from 'lucide-react';
 
 interface SetPiecesProps {
-  onNavigate: (page: 'home' | 'builder' | 'setpieces' | 'articles' | 'minutes') => void;
+  onNavigate: (page: 'home' | 'builder' | 'setpieces' | 'articles' | 'minutes' | 'drills') => void;
   players: Player[];
   setPlayers: (newPlayers: Player[] | ((prev: Player[]) => Player[])) => void;
 }
@@ -65,6 +65,19 @@ export interface SavedRoutine {
     data: ScenarioData;
     createdAt: number;
 }
+
+const MAX_UNDO = 50;
+type SetPiecesSnapshot = {
+  slots: TacticalSlot[];
+  assignments: Record<string, string>;
+  roles: Record<string, string>;
+  ballPosition: { x: number; y: number } | null;
+  arrows: PitchArrow[];
+  zones: PitchZone[];
+  opponents: PitchOpponent[];
+  notes: string;
+  plan: string;
+};
 
 // Unicode-safe Base64 encoding
 const safeBtoa = (str: string) => {
@@ -183,8 +196,59 @@ export const SetPieces: React.FC<SetPiecesProps> = ({
   
   // Local UI State (not persisted)
   const [pitchSize, setPitchSize] = useState(500); // px width
-  
+  const [arrowToolActive, setArrowToolActive] = useState<false | 'solid' | 'dashed'>(false);
+  const [history, setHistory] = useState<SetPiecesSnapshot[]>([]);
+  const [selectedArrowId, setSelectedArrowId] = useState<string | null>(null);
+
   const [deleteRoutineId, setDeleteRoutineId] = useState<string | null>(null);
+
+  const takeSnapshot = useCallback((): SetPiecesSnapshot => ({
+    slots: slots.map(s => ({ ...s })),
+    assignments: { ...currentAssignments },
+    roles: { ...currentRoles },
+    ballPosition: ballPosition ? { ...ballPosition } : null,
+    arrows: arrows.map(a => ({ ...a })),
+    zones: zones.map(z => ({ ...z })),
+    opponents: opponents.map(o => ({ ...o })),
+    notes,
+    plan,
+  }), [slots, currentAssignments, currentRoles, ballPosition, arrows, zones, opponents, notes, plan]);
+
+  const pushHistory = useCallback(() => {
+    setHistory(prev => [...prev.slice(1 - MAX_UNDO), takeSnapshot()]);
+  }, [takeSnapshot]);
+
+  const SIZE_STEP = 0.15;
+  const MIN_SIZE = 0.5;
+  const MAX_SIZE = 2;
+  useEffect(() => {
+    if (!selectedArrowId) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+      e.preventDefault();
+      const delta = e.key === 'ArrowUp' ? SIZE_STEP : -SIZE_STEP;
+      const clamp = (v: number) => Math.max(MIN_SIZE, Math.min(MAX_SIZE, v));
+      pushHistory();
+      setArrows(prev => prev.map(a => a.id === selectedArrowId ? { ...a, size: clamp((a.size ?? 1) + delta) } : a));
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [selectedArrowId, pushHistory]);
+
+  const undo = useCallback(() => {
+    if (history.length === 0) return;
+    const s = history[history.length - 1];
+    setSlots(s.slots);
+    setCurrentAssignments(s.assignments);
+    setCurrentRoles(s.roles);
+    setBallPosition(s.ballPosition);
+    setArrows(s.arrows);
+    setZones(s.zones);
+    setOpponents(s.opponents);
+    setNotes(s.notes);
+    setPlan(s.plan);
+    setHistory(prev => prev.slice(0, -1));
+  }, [history.length]);
 
   // Toast State
   const [toast, setToast] = useState<{ message: string, visible: boolean }>({ message: '', visible: false });
@@ -287,6 +351,7 @@ export const SetPieces: React.FC<SetPiecesProps> = ({
   };
 
   const handleNewPlayerDrop = (playerId: string, x: number, y: number) => {
+    pushHistory();
     const newSlotId = `sp-${Date.now()}`;
     const newSlot: TacticalSlot = {
         id: newSlotId,
@@ -302,6 +367,7 @@ export const SetPieces: React.FC<SetPiecesProps> = ({
   };
 
   const handlePlayerDrop = useCallback((draggedPlayerId: string, targetSlotId: string) => {
+    pushHistory();
     setCurrentAssignments((prev) => {
       const targetPlayerId = Object.keys(prev).find(key => prev[key] === targetSlotId);
       const oldSlotId = prev[draggedPlayerId];
@@ -323,7 +389,7 @@ export const SetPieces: React.FC<SetPiecesProps> = ({
   const handleRemovePlayer = (playerId: string) => {
       const assignedSlotId = currentAssignments[playerId];
       if (!assignedSlotId) return;
-
+      pushHistory();
       setSlots(prev => prev.filter(s => s.id !== assignedSlotId));
       setCurrentAssignments(prev => {
           const next = { ...prev };
@@ -333,27 +399,29 @@ export const SetPieces: React.FC<SetPiecesProps> = ({
   };
 
   const handleSlotMove = (slotId: string, x: number, y: number) => {
+    pushHistory();
     setSlots(prev => prev.map(s => s.id === slotId ? { ...s, x, y } : s));
   };
 
   const handleBallMove = (x: number, y: number) => {
+      pushHistory();
       setBallPosition({ x, y });
   };
-  
   const handleBallRemove = () => {
+      pushHistory();
       setBallPosition(null);
   };
 
-  // --- Arrow Handlers ---
-  const handleNewArrowDrop = (x: number, y: number) => {
-      const newArrow: PitchArrow = {
-          id: `arrow-${Date.now()}`,
-          startX: x,
-          startY: y,
-          endX: Math.min(100, x + 10),
-          endY: y
-      };
-      setArrows(prev => [...prev, newArrow]);
+  // --- Arrow Handlers (same as Drills: drag-to-draw, min length, solid/dashed) ---
+  const MIN_ARROW_LENGTH = 3;
+  const handleNewArrowDrop = (startX: number, startY: number, endX?: number, endY?: number, dropStyle?: 'solid' | 'dashed') => {
+      const ex = endX ?? Math.min(100, startX + 10);
+      const ey = endY ?? startY;
+      const len = Math.hypot(ex - startX, ey - startY);
+      if (len < MIN_ARROW_LENGTH) return;
+      pushHistory();
+      const style = dropStyle ?? (arrowToolActive === 'dashed' ? 'dashed' : 'solid');
+      setArrows(prev => [...prev, { id: `arrow-${Date.now()}`, startX, startY, endX: ex, endY: ey, style }]);
   };
 
   const handleArrowUpdate = (updatedArrow: PitchArrow) => {
@@ -361,29 +429,38 @@ export const SetPieces: React.FC<SetPiecesProps> = ({
   };
 
   const handleArrowRemove = (id: string) => {
+      pushHistory();
       setArrows(prev => prev.filter(a => a.id !== id));
   };
 
   // --- Zone Handlers ---
   const handleNewZoneDrop = (x: number, y: number) => {
+      pushHistory();
       const newZone: PitchZone = {
           id: `zone-${Date.now()}`,
           x,
-          y
+          y,
+          radius: 10
       };
       setZones(prev => [...prev, newZone]);
   };
 
   const handleZoneMove = (id: string, x: number, y: number) => {
+      pushHistory();
       setZones(prev => prev.map(z => z.id === id ? { ...z, x, y } : z));
   };
-
+  const handleZoneResize = (id: string, radius: number) => {
+      pushHistory();
+      setZones(prev => prev.map(z => z.id === id ? { ...z, radius } : z));
+  };
   const handleZoneRemove = (id: string) => {
+      pushHistory();
       setZones(prev => prev.filter(z => z.id !== id));
   };
 
   // --- Opponent Handlers ---
   const handleNewOpponentDrop = (x: number, y: number) => {
+      pushHistory();
       const newOpp: PitchOpponent = {
           id: `opp-${Date.now()}`,
           x,
@@ -393,18 +470,17 @@ export const SetPieces: React.FC<SetPiecesProps> = ({
   };
 
   const handleOpponentMove = (id: string, x: number, y: number) => {
+      pushHistory();
       setOpponents(prev => prev.map(o => o.id === id ? { ...o, x, y } : o));
   };
-
   const handleOpponentRemove = (id: string) => {
+      pushHistory();
       setOpponents(prev => prev.filter(o => o.id !== id));
   };
 
-  const handleClearBoardClick = () => {
-      setIsClearBoardModalOpen(true);
-  };
-
-  const confirmClearBoard = () => {
+  const handleClearPitch = () => {
+      if (!window.confirm('Remove everything on the pitch? You can use Undo to restore.')) return;
+      pushHistory();
       setSlots([]);
       setCurrentAssignments({});
       setCurrentRoles({});
@@ -414,7 +490,26 @@ export const SetPieces: React.FC<SetPiecesProps> = ({
       setOpponents([]);
       setNotes('');
       setPlan('');
-      setLoadedRoutineId(null); // Clear loaded routine ID as board is wiped
+      setLoadedRoutineId(null);
+      showToast('Pitch cleared');
+  };
+
+  const handleClearBoardClick = () => {
+      setIsClearBoardModalOpen(true);
+  };
+
+  const confirmClearBoard = () => {
+      pushHistory();
+      setSlots([]);
+      setCurrentAssignments({});
+      setCurrentRoles({});
+      setBallPosition(null);
+      setArrows([]);
+      setZones([]);
+      setOpponents([]);
+      setNotes('');
+      setPlan('');
+      setLoadedRoutineId(null);
       setIsClearBoardModalOpen(false);
       showToast('Pitch cleared');
   };
@@ -979,6 +1074,15 @@ export const SetPieces: React.FC<SetPiecesProps> = ({
                     )}
                 </div>
 
+                <button
+                    type="button"
+                    onClick={undo}
+                    disabled={history.length === 0}
+                    className="p-2 rounded-lg border border-slate-600 bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-slate-800 disabled:hover:text-slate-300 transition-colors ml-2"
+                    title="Undo last change"
+                >
+                    <Undo2 size={18} />
+                </button>
                 <button 
                     onClick={handleClearBoardClick}
                     className="bg-slate-800 hover:bg-red-900/50 text-slate-300 hover:text-red-400 px-3 py-1.5 rounded text-sm font-bold shadow transition-colors flex items-center gap-2 border border-slate-700 ml-2"
@@ -1052,9 +1156,9 @@ export const SetPieces: React.FC<SetPiecesProps> = ({
                             <ZoomOut size={16} />
                         </button>
                          <button 
-                            onClick={() => setPitchSize(500)}
+                            onClick={handleClearPitch}
                             className="px-2 py-1 bg-slate-800 text-[10px] font-bold text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg border border-slate-600 shadow-lg mt-1"
-                            title="Reset Zoom"
+                            title="Clear pitch (removes all elements)"
                         >
                             Reset
                         </button>
@@ -1083,9 +1187,15 @@ export const SetPieces: React.FC<SetPiecesProps> = ({
                             onNewArrowDrop={handleNewArrowDrop}
                             onArrowUpdate={handleArrowUpdate}
                             onArrowRemove={handleArrowRemove}
+                            arrowDrawingMode={!!arrowToolActive}
+                            arrowDrawStyle={arrowToolActive === 'dashed' ? 'dashed' : 'solid'}
+                            onArrowDragStart={pushHistory}
+                            onArrowSelect={setSelectedArrowId}
+                            onPitchBackgroundClick={() => setSelectedArrowId(null)}
                             zones={zones}
                             onNewZoneDrop={handleNewZoneDrop}
                             onZoneMove={handleZoneMove}
+                            onZoneResize={handleZoneResize}
                             onZoneRemove={handleZoneRemove}
                             opponents={opponents}
                             onNewOpponentDrop={handleNewOpponentDrop}
@@ -1166,47 +1276,70 @@ export const SetPieces: React.FC<SetPiecesProps> = ({
                                 <span>Elements</span>
                                 <div className="h-px bg-slate-700 flex-grow"></div>
                             </h3>
-                            <div className="flex gap-4 items-center justify-center">
-                                {/* Draggable Ball */}
-                                <div 
-                                    className="bg-slate-900 hover:bg-slate-700 text-slate-300 w-12 h-12 rounded-lg text-sm font-bold shadow-sm transition-all flex items-center justify-center border border-slate-600 cursor-grab active:cursor-grabbing hover:border-emerald-500/50 hover:text-white"
-                                    draggable
-                                    onDragStart={(e) => e.dataTransfer.setData('type', 'ball')}
-                                    title="Ball"
-                                >
-                                    <span className="text-2xl leading-none drop-shadow-md">⚽</span>
+                            <div className="flex gap-4 items-end justify-center flex-wrap">
+                                <div className="flex flex-col items-center gap-1">
+                                    <div
+                                        className="bg-slate-900 hover:bg-slate-700 text-slate-300 w-12 h-12 rounded-lg text-sm font-bold shadow-sm transition-all flex items-center justify-center border border-slate-600 cursor-grab active:cursor-grabbing hover:border-emerald-500/50 hover:text-white"
+                                        draggable
+                                        onDragStart={(e) => e.dataTransfer.setData('type', 'ball')}
+                                        title="Ball"
+                                    >
+                                        <span className="text-2xl leading-none drop-shadow-md">⚽</span>
+                                    </div>
+                                    <span className="text-[10px] text-slate-500">Ball</span>
                                 </div>
-
-                                {/* Draggable Arrow */}
-                                <div 
-                                    className="bg-slate-900 hover:bg-slate-700 text-slate-300 w-12 h-12 rounded-lg text-sm font-bold shadow-sm transition-all flex items-center justify-center border border-slate-600 cursor-grab active:cursor-grabbing hover:border-emerald-500/50 hover:text-white"
-                                    draggable
-                                    onDragStart={(e) => e.dataTransfer.setData('type', 'arrow')}
-                                    title="Action Arrow"
-                                >
-                                    <MoveRight size={24} />
+                                <div className="flex flex-col items-center gap-1">
+                                    <button
+                                        type="button"
+                                        onClick={() => setArrowToolActive(prev => prev === 'solid' ? false : 'solid')}
+                                        className={`w-12 h-12 rounded-lg flex items-center justify-center border transition-all shrink-0 ${arrowToolActive === 'solid' ? 'bg-emerald-600/30 border-emerald-500 text-emerald-200 ring-2 ring-emerald-500/70' : 'bg-slate-900 hover:bg-slate-700 text-slate-300 border-slate-600 cursor-grab active:cursor-grabbing hover:border-emerald-500/50 hover:text-white'}`}
+                                        draggable
+                                        onDragStart={(e) => { e.dataTransfer.setData('type', 'arrow'); e.dataTransfer.setData('arrowStyle', 'solid'); }}
+                                        title={arrowToolActive === 'solid' ? 'Run arrow — click again to turn off' : 'Arrow (run) — drag or draw'}
+                                    >
+                                        <MoveRight size={24} />
+                                    </button>
+                                    <span className="text-[10px] text-slate-500">Arrow</span>
                                 </div>
-
-                                {/* Draggable Zone */}
-                                <div 
-                                    className="bg-slate-900 hover:bg-slate-700 text-slate-300 w-12 h-12 rounded-lg text-sm font-bold shadow-sm transition-all flex items-center justify-center border border-slate-600 cursor-grab active:cursor-grabbing hover:border-emerald-500/50 hover:text-white"
-                                    draggable
-                                    onDragStart={(e) => e.dataTransfer.setData('type', 'zone')}
-                                    title="Target Zone"
-                                >
-                                    <CircleDashed size={24} className="text-yellow-400" />
+                                <div className="flex flex-col items-center gap-1">
+                                    <button
+                                        type="button"
+                                        onClick={() => setArrowToolActive(prev => prev === 'dashed' ? false : 'dashed')}
+                                        className={`w-12 h-12 rounded-lg flex items-center justify-center border transition-all shrink-0 ${arrowToolActive === 'dashed' ? 'bg-emerald-600/30 border-emerald-500 text-emerald-200 ring-2 ring-emerald-500/70' : 'bg-slate-900 hover:bg-slate-700 text-slate-300 border-slate-600 cursor-grab active:cursor-grabbing hover:border-emerald-500/50 hover:text-white'}`}
+                                        draggable
+                                        onDragStart={(e) => { e.dataTransfer.setData('type', 'arrow'); e.dataTransfer.setData('arrowStyle', 'dashed'); }}
+                                        title={arrowToolActive === 'dashed' ? 'Pass — click again to turn off' : 'Pass (dotted) — drag or draw'}
+                                    >
+                                        <Send size={22} />
+                                    </button>
+                                    <span className="text-[10px] text-slate-500">Pass</span>
                                 </div>
-
-                                {/* Draggable Opponent */}
-                                <div 
-                                    className="bg-slate-900 hover:bg-slate-700 text-slate-300 w-12 h-12 rounded-lg text-sm font-bold shadow-sm transition-all flex items-center justify-center border border-slate-600 cursor-grab active:cursor-grabbing hover:border-emerald-500/50 hover:text-white"
-                                    draggable
-                                    onDragStart={(e) => e.dataTransfer.setData('type', 'opponent')}
-                                    title="Opposition Player"
-                                >
-                                    <User size={24} className="text-slate-400" />
+                                <div className="flex flex-col items-center gap-1">
+                                    <div
+                                        className="bg-slate-900 hover:bg-slate-700 text-slate-300 w-12 h-12 rounded-lg text-sm font-bold shadow-sm transition-all flex items-center justify-center border border-slate-600 cursor-grab active:cursor-grabbing hover:border-emerald-500/50 hover:text-white"
+                                        draggable
+                                        onDragStart={(e) => e.dataTransfer.setData('type', 'zone')}
+                                        title="Target Zone"
+                                    >
+                                        <CircleDashed size={24} className="text-yellow-400" />
+                                    </div>
+                                    <span className="text-[10px] text-slate-500">Zone</span>
+                                </div>
+                                <div className="flex flex-col items-center gap-1">
+                                    <div
+                                        className="bg-slate-900 hover:bg-slate-700 text-slate-300 w-12 h-12 rounded-lg text-sm font-bold shadow-sm transition-all flex items-center justify-center border border-slate-600 cursor-grab active:cursor-grabbing hover:border-emerald-500/50 hover:text-white"
+                                        draggable
+                                        onDragStart={(e) => e.dataTransfer.setData('type', 'opponent')}
+                                        title="Opposition Player"
+                                    >
+                                        <User size={24} className="text-slate-400" />
+                                    </div>
+                                    <span className="text-[10px] text-slate-500">Opponent</span>
                                 </div>
                             </div>
+                            {selectedArrowId && (
+                                <p className="text-[10px] text-amber-500/90 text-center mt-2">Selected arrow: press ↑ or ↓ to resize</p>
+                            )}
                         </div>
 
                         {/* Set Piece Plan Box */}

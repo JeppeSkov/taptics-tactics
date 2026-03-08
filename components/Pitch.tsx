@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Player, TacticalSlot } from '../types';
 import { Shirt, X, User } from 'lucide-react';
 
@@ -9,12 +9,17 @@ export interface PitchArrow {
   endX: number;
   endY: number;
   color?: string;
+  /** 'dashed' = pass, default = run/movement */
+  style?: 'solid' | 'dashed';
+  /** Scale for stroke and arrowhead (0.5–2), default 1 */
+  size?: number;
 }
 
 export interface PitchZone {
     id: string;
     x: number;
     y: number;
+    radius?: number;
 }
 
 export interface PitchOpponent {
@@ -22,6 +27,70 @@ export interface PitchOpponent {
     x: number;
     y: number;
     label?: string;
+}
+
+export interface PitchGoal {
+    id: string;
+    x: number;
+    y: number;
+    size?: number;
+}
+
+export interface PitchSmallGoal {
+    id: string;
+    x: number;
+    y: number;
+    size?: number;
+}
+
+/** Cone marker (Hudl/XPS-style equipment) */
+export interface PitchCone {
+    id: string;
+    x: number;
+    y: number;
+    size?: number;
+}
+
+/** Standing mannequin / dummy (passive defender) */
+export interface PitchMannequin {
+    id: string;
+    x: number;
+    y: number;
+    size?: number;
+}
+
+/** Passing gate: two poles with gap */
+export interface PitchGate {
+    id: string;
+    x: number;
+    y: number;
+    size?: number;
+}
+
+/** Single pole / stick marker */
+export interface PitchPole {
+    id: string;
+    x: number;
+    y: number;
+    size?: number;
+}
+
+/** Agility ladder segment */
+export interface PitchLadder {
+    id: string;
+    x: number;
+    y: number;
+    size?: number;
+}
+
+/** Placed player marker (no number, click-to-place, color only) */
+export interface PitchPlacedPlayer {
+    id: string;
+    x: number;
+    y: number;
+    color: string;
+    /** Scale 0.5–2, default 1 */
+    size?: number;
 }
 
 interface PitchProps {
@@ -33,20 +102,29 @@ interface PitchProps {
   onRemovePlayer?: (playerId: string) => void;
   
   // Ball Props
-  ballPosition?: { x: number, y: number } | null;
+  ballPosition?: { x: number, y: number; size?: number } | null;
   onBallMove?: (x: number, y: number) => void;
   onBallRemove?: () => void;
 
   // Arrow Props
   arrows?: PitchArrow[];
   onArrowUpdate?: (arrow: PitchArrow) => void;
-  onNewArrowDrop?: (x: number, y: number) => void;
+  onNewArrowDrop?: (startX: number, startY: number, endX?: number, endY?: number, style?: 'solid' | 'dashed') => void;
   onArrowRemove?: (id: string) => void;
+  /** When true, clicking the pitch background adds a new arrow (drawing mode). */
+  arrowDrawingMode?: boolean;
+  /** Style of arrow to draw when in drawing mode (solid or dashed). */
+  arrowDrawStyle?: 'solid' | 'dashed';
+  /** Called when user starts dragging an existing arrow (for undo: push state once per drag). */
+  onArrowDragStart?: () => void;
+  /** Called when user selects an arrow (e.g. for resize with keyboard). */
+  onArrowSelect?: (id: string) => void;
 
   // Zone Props
   zones?: PitchZone[];
   onNewZoneDrop?: (x: number, y: number) => void;
   onZoneMove?: (id: string, x: number, y: number) => void;
+  onZoneResize?: (id: string, radius: number) => void;
   onZoneRemove?: (id: string) => void;
 
   // Opponent Props
@@ -55,10 +133,60 @@ interface PitchProps {
   onOpponentMove?: (id: string, x: number, y: number) => void;
   onOpponentRemove?: (id: string) => void;
 
+  // Goal Props (for Drills)
+  goals?: PitchGoal[];
+  onNewGoalDrop?: (x: number, y: number) => void;
+  onGoalMove?: (id: string, x: number, y: number) => void;
+  onGoalRemove?: (id: string) => void;
+  smallGoals?: PitchSmallGoal[];
+  onNewSmallGoalDrop?: (x: number, y: number) => void;
+  onSmallGoalMove?: (id: string, x: number, y: number) => void;
+  onSmallGoalRemove?: (id: string) => void;
+
+  // Pro coaching equipment (Hudl / XPS style)
+  cones?: PitchCone[];
+  onNewConeDrop?: (x: number, y: number) => void;
+  onConeMove?: (id: string, x: number, y: number) => void;
+  onConeRemove?: (id: string) => void;
+  mannequins?: PitchMannequin[];
+  onNewMannequinDrop?: (x: number, y: number) => void;
+  onMannequinMove?: (id: string, x: number, y: number) => void;
+  onMannequinRemove?: (id: string) => void;
+  gates?: PitchGate[];
+  onNewGateDrop?: (x: number, y: number) => void;
+  onGateMove?: (id: string, x: number, y: number) => void;
+  onGateRemove?: (id: string) => void;
+  poles?: PitchPole[];
+  onNewPoleDrop?: (x: number, y: number) => void;
+  onPoleMove?: (id: string, x: number, y: number) => void;
+  onPoleRemove?: (id: string) => void;
+  ladders?: PitchLadder[];
+  onNewLadderDrop?: (x: number, y: number) => void;
+  onLadderMove?: (id: string, x: number, y: number) => void;
+  onLadderRemove?: (id: string) => void;
+
+  // Placed players (click-to-place, no number, color only)
+  placedPlayers?: PitchPlacedPlayer[];
+  /** When true, clicking the pitch background places a new player. */
+  placedPlayerDrawingMode?: boolean;
+  onNewPlacedPlayerDrop?: (x: number, y: number) => void;
+  onPlacedPlayerMove?: (id: string, x: number, y: number) => void;
+  onPlacedPlayerRemove?: (id: string) => void;
+  onPlacedPlayerDragStart?: () => void;
+
+  /** When true, clicking the pitch background places one instance of the current element (Drills click-to-place). */
+  elementPlacementMode?: boolean;
+  onElementPlace?: (x: number, y: number) => void;
+
+  /** Called when user clicks an element (for selection / size adjust). type + id (id undefined for ball). */
+  onElementClick?: (type: 'ball' | 'goal' | 'smallGoal' | 'cone' | 'mannequin' | 'gate' | 'pole' | 'ladder' | 'placedPlayer', id?: string) => void;
+  /** Called when user clicks the pitch background (e.g. to deselect). */
+  onPitchBackgroundClick?: () => void;
+
   kitColor: string;
   numberColor: string;
   isExport?: boolean;
-  viewMode?: 'full' | 'offensive' | 'defensive';
+  viewMode?: 'full' | 'offensive' | 'defensive' | 'penalty';
   playerIconStyle?: 'shirt' | 'circle';
   isSmallMode?: boolean; 
 }
@@ -77,14 +205,57 @@ export const Pitch: React.FC<PitchProps> = ({
   onArrowUpdate,
   onNewArrowDrop,
   onArrowRemove,
+  arrowDrawingMode = false,
+  arrowDrawStyle = 'solid',
+  onArrowDragStart,
+  onArrowSelect,
   zones = [],
   onNewZoneDrop,
   onZoneMove,
+  onZoneResize,
   onZoneRemove,
   opponents = [],
   onNewOpponentDrop,
   onOpponentMove,
   onOpponentRemove,
+  goals = [],
+  onNewGoalDrop,
+  onGoalMove,
+  onGoalRemove,
+  smallGoals = [],
+  onNewSmallGoalDrop,
+  onSmallGoalMove,
+  onSmallGoalRemove,
+  cones = [],
+  onNewConeDrop,
+  onConeMove,
+  onConeRemove,
+  mannequins = [],
+  onNewMannequinDrop,
+  onMannequinMove,
+  onMannequinRemove,
+  gates = [],
+  onNewGateDrop,
+  onGateMove,
+  onGateRemove,
+  poles = [],
+  onNewPoleDrop,
+  onPoleMove,
+  onPoleRemove,
+  ladders = [],
+  onNewLadderDrop,
+  onLadderMove,
+  onLadderRemove,
+  placedPlayers = [],
+  placedPlayerDrawingMode = false,
+  onNewPlacedPlayerDrop,
+  onPlacedPlayerMove,
+  onPlacedPlayerRemove,
+  onPlacedPlayerDragStart,
+  elementPlacementMode = false,
+  onElementPlace,
+  onElementClick,
+  onPitchBackgroundClick,
   kitColor, 
   numberColor,
   isExport = false,
@@ -93,6 +264,7 @@ export const Pitch: React.FC<PitchProps> = ({
   isSmallMode = false
 }) => {
   const getPlayerInSlot = (slotId: string) => players.find(p => p.assignedSlot === slotId);
+  const scaleVal = (s: number | undefined | null): number => (typeof s === 'number' && Number.isFinite(s) && s > 0 ? s : 1);
 
   // -- Drag Logic for Arrows --
   const [dragState, setDragState] = useState<{
@@ -105,8 +277,64 @@ export const Pitch: React.FC<PitchProps> = ({
 
   // Track selected arrow to show handles/delete button
   const [selectedArrowId, setSelectedArrowId] = useState<string | null>(null);
+  // Drag-to-draw arrow (start on mousedown, end on mouseup)
+  const [drawingArrow, setDrawingArrow] = useState<{ startX: number; startY: number; endX: number; endY: number } | null>(null);
+
+  const [zoneResizeState, setZoneResizeState] = useState<{ id: string } | null>(null);
+
+  // Figma-style alignment guides: show when drop snaps to another element's line
+  const [alignmentGuides, setAlignmentGuides] = useState<{ vertical?: number; horizontal?: number } | null>(null);
+  useEffect(() => {
+    if (!alignmentGuides) return;
+    const t = setTimeout(() => setAlignmentGuides(null), 400);
+    return () => clearTimeout(t);
+  }, [alignmentGuides]);
 
   const containerRef = useRef<HTMLDivElement>(null);
+
+  const ALIGN_THRESHOLD = 2; // snap when within 2% of pitch
+  function getAlignmentTargets(excludeX?: number, excludeY?: number): { xs: number[]; ys: number[] } {
+    const xs: number[] = [];
+    const ys: number[] = [];
+    const add = (x: number, y: number) => {
+      if (excludeX === undefined || excludeY === undefined || Math.abs(x - excludeX) > 0.01 || Math.abs(y - excludeY) > 0.01) {
+        xs.push(x); ys.push(y);
+      }
+    };
+    slots.forEach(s => add(s.x, s.y));
+    if (ballPosition) add(ballPosition.x, ballPosition.y);
+    goals.forEach(g => add(g.x, g.y));
+    smallGoals.forEach(sg => add(sg.x, sg.y));
+    cones.forEach(c => add(c.x, c.y));
+    mannequins.forEach(m => add(m.x, m.y));
+    gates.forEach(g => add(g.x, g.y));
+    poles.forEach(p => add(p.x, p.y));
+    ladders.forEach(l => add(l.x, l.y));
+    opponents.forEach(o => add(o.x, o.y));
+    zones.forEach(z => add(z.x, z.y));
+    xs.push(50); ys.push(50); // pitch center
+    return { xs: [...new Set(xs)], ys: [...new Set(ys)] };
+  }
+  function snapToAlignment(rawX: number, rawY: number, xs: number[], ys: number[]): { x: number; y: number; guideV?: number; guideH?: number } {
+    let x = rawX, y = rawY;
+    let guideV: number | undefined, guideH: number | undefined;
+    for (const tx of xs) {
+      if (Math.abs(rawX - tx) <= ALIGN_THRESHOLD) { x = tx; guideV = tx; break; }
+    }
+    for (const ty of ys) {
+      if (Math.abs(rawY - ty) <= ALIGN_THRESHOLD) { y = ty; guideH = ty; break; }
+    }
+    return { x, y, guideV, guideH };
+  }
+  function applyAlignment(rawX: number, rawY: number, excludeX?: number, excludeY?: number): { x: number; y: number } {
+    const { xs, ys } = getAlignmentTargets(excludeX, excludeY);
+    const result = snapToAlignment(rawX, rawY, xs, ys);
+    if (result.guideV !== undefined || result.guideH !== undefined) {
+      setAlignmentGuides({ vertical: result.guideV, horizontal: result.guideH });
+    }
+    return { x: result.x, y: result.y };
+  }
+
 
   const calculateCoords = (e: React.DragEvent) => {
     if (!containerRef.current) return { x: 0, y: 0 };
@@ -131,10 +359,35 @@ export const Pitch: React.FC<PitchProps> = ({
     e.stopPropagation();
 
     // 1. Handle "Passthrough" drops (Ball, Zone, Opponent, Arrow)
-    // If we drop these ON a player, we still want to move them.
     const type = e.dataTransfer.getData('type');
     if (type) {
-        const { x, y } = calculateCoords(e);
+        const raw = calculateCoords(e);
+        const getExcludeSlot = (): { x: number; y: number } | undefined => {
+          if (type === 'ball' && ballPosition) return ballPosition;
+          const zoneId = e.dataTransfer.getData('zoneId');
+          if (zoneId) { const z = zones.find(zo => zo.id === zoneId); return z ? { x: z.x, y: z.y } : undefined; }
+          const oppId = e.dataTransfer.getData('opponentId');
+          if (oppId) { const o = opponents.find(op => op.id === oppId); return o ? { x: o.x, y: o.y } : undefined; }
+          const goalId = e.dataTransfer.getData('goalId');
+          if (goalId) { const g = goals.find(go => go.id === goalId); return g ? { x: g.x, y: g.y } : undefined; }
+          const smallGoalId = e.dataTransfer.getData('smallGoalId');
+          if (smallGoalId) { const sg = smallGoals.find(sgo => sgo.id === smallGoalId); return sg ? { x: sg.x, y: sg.y } : undefined; }
+          const coneId = e.dataTransfer.getData('coneId');
+          if (coneId) { const c = cones.find(co => co.id === coneId); return c ? { x: c.x, y: c.y } : undefined; }
+          const mannequinId = e.dataTransfer.getData('mannequinId');
+          if (mannequinId) { const m = mannequins.find(mo => mo.id === mannequinId); return m ? { x: m.x, y: m.y } : undefined; }
+          const gateId = e.dataTransfer.getData('gateId');
+          if (gateId) { const g = gates.find(go => go.id === gateId); return g ? { x: g.x, y: g.y } : undefined; }
+          const poleId = e.dataTransfer.getData('poleId');
+          if (poleId) { const p = poles.find(po => po.id === poleId); return p ? { x: p.x, y: p.y } : undefined; }
+          const ladderId = e.dataTransfer.getData('ladderId');
+          if (ladderId) { const l = ladders.find(lo => lo.id === ladderId); return l ? { x: l.x, y: l.y } : undefined; }
+          const placedPlayerId = e.dataTransfer.getData('placedPlayerId');
+          if (placedPlayerId) { const p = placedPlayers.find(po => po.id === placedPlayerId); return p ? { x: p.x, y: p.y } : undefined; }
+          return undefined;
+        };
+        const excl = getExcludeSlot();
+        const { x, y } = applyAlignment(raw.x, raw.y, excl?.x, excl?.y);
         if (type === 'ball' && onBallMove) onBallMove(x, y);
         if (type === 'zone' && onZoneMove) {
              const zoneId = e.dataTransfer.getData('zoneId');
@@ -144,26 +397,72 @@ export const Pitch: React.FC<PitchProps> = ({
             const oppId = e.dataTransfer.getData('opponentId');
             if(oppId) onOpponentMove(oppId, x, y);
         }
-        if (type === 'arrow' && onNewArrowDrop) onNewArrowDrop(x, y);
-        // If type is defined, we are done (unless we want to support something else)
+        if (type === 'arrow' && onNewArrowDrop) onNewArrowDrop(raw.x, raw.y, undefined, undefined, (e.dataTransfer.getData('arrowStyle') || 'solid') as 'solid' | 'dashed');
+        if (type === 'goal') {
+            const goalId = e.dataTransfer.getData('goalId');
+            if (goalId && onGoalMove) onGoalMove(goalId, x, y);
+            else if (onNewGoalDrop) onNewGoalDrop(x, y);
+            return;
+        }
+        if (type === 'smallGoal') {
+            const smallGoalId = e.dataTransfer.getData('smallGoalId');
+            if (smallGoalId && onSmallGoalMove) onSmallGoalMove(smallGoalId, x, y);
+            else if (onNewSmallGoalDrop) onNewSmallGoalDrop(x, y);
+            return;
+        }
+        if (type === 'cone') {
+            const id = e.dataTransfer.getData('coneId');
+            if (id && onConeMove) onConeMove(id, x, y);
+            else if (onNewConeDrop) onNewConeDrop(x, y);
+            return;
+        }
+        if (type === 'mannequin') {
+            const id = e.dataTransfer.getData('mannequinId');
+            if (id && onMannequinMove) onMannequinMove(id, x, y);
+            else if (onNewMannequinDrop) onNewMannequinDrop(x, y);
+            return;
+        }
+        if (type === 'gate') {
+            const id = e.dataTransfer.getData('gateId');
+            if (id && onGateMove) onGateMove(id, x, y);
+            else if (onNewGateDrop) onNewGateDrop(x, y);
+            return;
+        }
+        if (type === 'pole') {
+            const id = e.dataTransfer.getData('poleId');
+            if (id && onPoleMove) onPoleMove(id, x, y);
+            else if (onNewPoleDrop) onNewPoleDrop(x, y);
+            return;
+        }
+        if (type === 'ladder') {
+            const id = e.dataTransfer.getData('ladderId');
+            if (id && onLadderMove) onLadderMove(id, x, y);
+            else if (onNewLadderDrop) onNewLadderDrop(x, y);
+            return;
+        }
+        if (type === 'placedPlayer' && onPlacedPlayerMove) {
+            const id = e.dataTransfer.getData('placedPlayerId');
+            if (id) onPlacedPlayerMove(id, x, y);
+            return;
+        }
         return;
     }
 
     const draggedSlotId = e.dataTransfer.getData('slotId');
-    
+    const slotExcl = draggedSlotId ? slots.find(s => s.id === draggedSlotId) : undefined;
+
     // 2. Handle "Self-Move" (Dragging the player slightly onto themselves)
     if (draggedSlotId === targetSlotId) {
-         const { x, y } = calculateCoords(e);
+         const raw = calculateCoords(e);
+         const { x, y } = applyAlignment(raw.x, raw.y, slotExcl?.x, slotExcl?.y);
          onSlotMove(draggedSlotId, x, y);
          return;
     }
 
     // 3. Handle Slot-to-Slot Dragging
-    // In Set Pieces mode (isSmallMode), we generally want to allow free movement (stacking/overlapping)
-    // rather than swapping slots, because users create clusters of players.
     if (isSmallMode && draggedSlotId) {
-         const { x, y } = calculateCoords(e);
-         // Treat as a move to the dropped location (overlapping the target)
+         const raw = calculateCoords(e);
+         const { x, y } = applyAlignment(raw.x, raw.y, slotExcl?.x, slotExcl?.y);
          onSlotMove(draggedSlotId, x, y);
          return;
     }
@@ -178,19 +477,47 @@ export const Pitch: React.FC<PitchProps> = ({
   // Drop handler for the Pitch background
   const handlePitchDrop = (e: React.DragEvent) => {
     e.preventDefault();
-    const { x, y } = calculateCoords(e);
-    
+    const raw = calculateCoords(e);
     const type = e.dataTransfer.getData('type');
-    
+    const slotId = e.dataTransfer.getData('slotId');
+    const zoneId = e.dataTransfer.getData('zoneId');
+    const opponentId = e.dataTransfer.getData('opponentId');
+    const goalId = e.dataTransfer.getData('goalId');
+    const smallGoalId = e.dataTransfer.getData('smallGoalId');
+    const coneId = e.dataTransfer.getData('coneId');
+    const mannequinId = e.dataTransfer.getData('mannequinId');
+    const gateId = e.dataTransfer.getData('gateId');
+    const poleId = e.dataTransfer.getData('poleId');
+    const ladderId = e.dataTransfer.getData('ladderId');
+    const playerId = e.dataTransfer.getData('playerId');
+    const placedPlayerId = e.dataTransfer.getData('placedPlayerId');
+    const getExclude = (): { x: number; y: number } | undefined => {
+      if (type === 'ball' && ballPosition) return ballPosition;
+      if (slotId) { const s = slots.find(sl => sl.id === slotId); return s ? { x: s.x, y: s.y } : undefined; }
+      if (zoneId) { const z = zones.find(zo => zo.id === zoneId); return z ? { x: z.x, y: z.y } : undefined; }
+      if (opponentId) { const o = opponents.find(op => op.id === opponentId); return o ? { x: o.x, y: o.y } : undefined; }
+      if (goalId) { const g = goals.find(go => go.id === goalId); return g ? { x: g.x, y: g.y } : undefined; }
+      if (smallGoalId) { const sg = smallGoals.find(sgo => sgo.id === smallGoalId); return sg ? { x: sg.x, y: sg.y } : undefined; }
+      if (coneId) { const c = cones.find(co => co.id === coneId); return c ? { x: c.x, y: c.y } : undefined; }
+      if (mannequinId) { const m = mannequins.find(mo => mo.id === mannequinId); return m ? { x: m.x, y: m.y } : undefined; }
+      if (gateId) { const g = gates.find(go => go.id === gateId); return g ? { x: g.x, y: g.y } : undefined; }
+      if (poleId) { const p = poles.find(po => po.id === poleId); return p ? { x: p.x, y: p.y } : undefined; }
+      if (ladderId) { const l = ladders.find(lo => lo.id === ladderId); return l ? { x: l.x, y: l.y } : undefined; }
+      if (placedPlayerId) { const p = placedPlayers.find(po => po.id === placedPlayerId); return p ? { x: p.x, y: p.y } : undefined; }
+      return undefined;
+    };
+    const excl = getExclude();
+    const { x, y } = applyAlignment(raw.x, raw.y, excl?.x, excl?.y);
+
     // Handle Ball Drop
     if (type === 'ball' && onBallMove) {
         onBallMove(x, y);
         return;
     }
 
-    // Handle Arrow Drop
+    // Handle Arrow Drop (no snap for new arrow)
     if (type === 'arrow' && onNewArrowDrop) {
-        onNewArrowDrop(x, y);
+        onNewArrowDrop(raw.x, raw.y, undefined, undefined, (e.dataTransfer.getData('arrowStyle') || 'solid') as 'solid' | 'dashed');
         return;
     }
 
@@ -206,10 +533,57 @@ export const Pitch: React.FC<PitchProps> = ({
         return;
     }
 
-    const slotId = e.dataTransfer.getData('slotId');
-    const zoneId = e.dataTransfer.getData('zoneId');
-    const opponentId = e.dataTransfer.getData('opponentId');
-    const playerId = e.dataTransfer.getData('playerId');
+    // Handle Goal Drop (new or move existing)
+    if (type === 'goal') {
+        const goalId = e.dataTransfer.getData('goalId');
+        if (goalId && onGoalMove) onGoalMove(goalId, x, y);
+        else if (onNewGoalDrop) onNewGoalDrop(x, y);
+        return;
+    }
+
+    // Handle Small Goal Drop (new or move existing)
+    if (type === 'smallGoal') {
+        const smallGoalId = e.dataTransfer.getData('smallGoalId');
+        if (smallGoalId && onSmallGoalMove) onSmallGoalMove(smallGoalId, x, y);
+        else if (onNewSmallGoalDrop) onNewSmallGoalDrop(x, y);
+        return;
+    }
+
+    if (type === 'cone') {
+        const id = e.dataTransfer.getData('coneId');
+        if (id && onConeMove) onConeMove(id, x, y);
+        else if (onNewConeDrop) onNewConeDrop(x, y);
+        return;
+    }
+    if (type === 'mannequin') {
+        const id = e.dataTransfer.getData('mannequinId');
+        if (id && onMannequinMove) onMannequinMove(id, x, y);
+        else if (onNewMannequinDrop) onNewMannequinDrop(x, y);
+        return;
+    }
+    if (type === 'gate') {
+        const id = e.dataTransfer.getData('gateId');
+        if (id && onGateMove) onGateMove(id, x, y);
+        else if (onNewGateDrop) onNewGateDrop(x, y);
+        return;
+    }
+    if (type === 'pole') {
+        const id = e.dataTransfer.getData('poleId');
+        if (id && onPoleMove) onPoleMove(id, x, y);
+        else if (onNewPoleDrop) onNewPoleDrop(x, y);
+        return;
+    }
+    if (type === 'ladder') {
+        const id = e.dataTransfer.getData('ladderId');
+        if (id && onLadderMove) onLadderMove(id, x, y);
+        else if (onNewLadderDrop) onNewLadderDrop(x, y);
+        return;
+    }
+    if (type === 'placedPlayer' && onPlacedPlayerMove) {
+        const id = e.dataTransfer.getData('placedPlayerId');
+        if (id) onPlacedPlayerMove(id, x, y);
+        return;
+    }
 
     if (slotId) {
       onSlotMove(slotId, x, y);
@@ -217,6 +591,22 @@ export const Pitch: React.FC<PitchProps> = ({
       onZoneMove(zoneId, x, y);
     } else if (opponentId && onOpponentMove) {
       onOpponentMove(opponentId, x, y);
+    } else if (goalId && onGoalMove) {
+      onGoalMove(goalId, x, y);
+    } else if (smallGoalId && onSmallGoalMove) {
+      onSmallGoalMove(smallGoalId, x, y);
+    } else if (coneId && onConeMove) {
+      onConeMove(coneId, x, y);
+    } else if (mannequinId && onMannequinMove) {
+      onMannequinMove(mannequinId, x, y);
+    } else if (gateId && onGateMove) {
+      onGateMove(gateId, x, y);
+    } else if (poleId && onPoleMove) {
+      onPoleMove(poleId, x, y);
+    } else if (ladderId && onLadderMove) {
+      onLadderMove(ladderId, x, y);
+    } else if (placedPlayerId && onPlacedPlayerMove) {
+      onPlacedPlayerMove(placedPlayerId, x, y);
     } else if (playerId && onNewPlayerDrop) {
       onNewPlayerDrop(playerId, x, y);
     }
@@ -240,31 +630,112 @@ export const Pitch: React.FC<PitchProps> = ({
       e.stopPropagation();
   };
 
+  const handleGoalDragStart = (e: React.DragEvent, goalId: string) => {
+      e.dataTransfer.setData('goalId', goalId);
+      e.dataTransfer.setData('type', 'goal');
+      e.stopPropagation();
+  };
+
+  const handleSmallGoalDragStart = (e: React.DragEvent, smallGoalId: string) => {
+      e.dataTransfer.setData('smallGoalId', smallGoalId);
+      e.dataTransfer.setData('type', 'smallGoal');
+      e.stopPropagation();
+  };
+
+  const handleConeDragStart = (e: React.DragEvent, id: string) => {
+      e.dataTransfer.setData('coneId', id);
+      e.dataTransfer.setData('type', 'cone');
+      e.stopPropagation();
+  };
+  const handleMannequinDragStart = (e: React.DragEvent, id: string) => {
+      e.dataTransfer.setData('mannequinId', id);
+      e.dataTransfer.setData('type', 'mannequin');
+      e.stopPropagation();
+  };
+  const handleGateDragStart = (e: React.DragEvent, id: string) => {
+      e.dataTransfer.setData('gateId', id);
+      e.dataTransfer.setData('type', 'gate');
+      e.stopPropagation();
+  };
+  const handlePoleDragStart = (e: React.DragEvent, id: string) => {
+      e.dataTransfer.setData('poleId', id);
+      e.dataTransfer.setData('type', 'pole');
+      e.stopPropagation();
+  };
+  const handleLadderDragStart = (e: React.DragEvent, id: string) => {
+      e.dataTransfer.setData('ladderId', id);
+      e.dataTransfer.setData('type', 'ladder');
+      e.stopPropagation();
+  };
+  const handlePlacedPlayerDragStart = (e: React.DragEvent, id: string) => {
+      e.dataTransfer.setData('placedPlayerId', id);
+      e.dataTransfer.setData('type', 'placedPlayer');
+      onPlacedPlayerDragStart?.();
+      e.stopPropagation();
+  };
+
   // -- Arrow Interaction Handlers --
   const handleArrowMouseDown = (e: React.MouseEvent, id: string, mode: 'start' | 'end' | 'move') => {
     if (isExport) return;
     e.stopPropagation();
     e.preventDefault();
     
-    // Select the arrow on interaction
+    // Select the arrow on interaction (for resize via keyboard in parent)
     setSelectedArrowId(id);
+    onArrowSelect?.(id);
 
     if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
     const startX = ((e.clientX - rect.left) / rect.width) * 100;
     const startY = ((e.clientY - rect.top) / rect.height) * 100;
 
+    onArrowDragStart?.();
     setDragState({ type: 'arrow', id, mode, lastX: startX, lastY: startY });
   };
 
+  const getPct = (e: { clientX: number; clientY: number }) => {
+      if (!containerRef.current) return { x: 0, y: 0 };
+      const rect = containerRef.current.getBoundingClientRect();
+      return { x: Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100)), y: Math.max(0, Math.min(100, ((e.clientY - rect.top) / rect.height) * 100)) };
+  };
   const handlePitchClick = (e: React.MouseEvent) => {
-      // If clicking the background, deselect arrow
-      if(e.target === containerRef.current || e.target === e.currentTarget) {
-          setSelectedArrowId(null);
+      if (e.target !== containerRef.current && e.target !== e.currentTarget) return;
+      if (elementPlacementMode && onElementPlace && containerRef.current) {
+          const { x, y } = getPct(e);
+          onElementPlace(x, y);
+          return;
+      }
+      if (placedPlayerDrawingMode && onNewPlacedPlayerDrop && containerRef.current) {
+          const { x, y } = getPct(e);
+          onNewPlacedPlayerDrop(x, y);
+          return;
+      }
+      onPitchBackgroundClick?.();
+      setSelectedArrowId(null);
+      if (arrowDrawingMode && onNewArrowDrop && containerRef.current) {
+          const { x, y } = getPct(e);
+          setDrawingArrow({ startX: x, startY: y, endX: x, endY: y });
       }
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
+      if (drawingArrow) { const p = getPct(e); setDrawingArrow(d => d ? { ...d, endX: p.x, endY: p.y } : null); return; }
+      // Zone resize: radius = distance from zone center to mouse → true circle
+      if (zoneResizeState && onZoneResize && containerRef.current) {
+          const rect = containerRef.current.getBoundingClientRect();
+          const zone = zones.find(z => z.id === zoneResizeState.id);
+          if (!zone) return;
+          const cx = rect.left + (zone.x / 100) * rect.width;
+          const cy = rect.top + (zone.y / 100) * rect.height;
+          const dx = e.clientX - cx;
+          const dy = e.clientY - cy;
+          const distPx = Math.sqrt(dx * dx + dy * dy);
+          const newRadiusPct = (distPx / rect.width) * 100;
+          const clamped = Math.max(3, Math.min(30, newRadiusPct));
+          onZoneResize(zoneResizeState.id, clamped);
+          return;
+      }
+
       // General mouse move for Arrow dragging (handled at container level to catch fast movements)
       if (!dragState || !onArrowUpdate || !arrows) return;
 
@@ -296,8 +767,21 @@ export const Pitch: React.FC<PitchProps> = ({
       }
   };
 
-  const handleMouseUp = () => {
+  const handleMouseUp = (e: React.MouseEvent) => {
+      if (drawingArrow && onNewArrowDrop) {
+          const end = e ? getPct(e) : { x: drawingArrow.endX, y: drawingArrow.endY };
+          onNewArrowDrop(drawingArrow.startX, drawingArrow.startY, end.x, end.y, arrowDrawStyle);
+          setDrawingArrow(null);
+      }
       setDragState(null);
+      setZoneResizeState(null);
+  };
+
+  const handleZoneResizeMouseDown = (e: React.MouseEvent, zoneId: string) => {
+      if (isExport || !onZoneResize) return;
+      e.stopPropagation();
+      e.preventDefault();
+      setZoneResizeState({ id: zoneId });
   };
 
   const handleArrowDelete = (e: React.MouseEvent, id: string) => {
@@ -328,20 +812,18 @@ export const Pitch: React.FC<PitchProps> = ({
   const nameTextSize = isExport ? 'text-base font-bold' : (isSmallMode ? 'text-[10px] font-bold' : 'text-xs font-bold');
   const namePadding = isExport ? 'px-3 py-1' : (isSmallMode ? 'px-1.5 py-0' : 'px-2 py-0.5');
   
-  const aspectRatioClass = viewMode === 'full' ? 'aspect-[5/6]' : 'aspect-[5/3]';
+  const aspectRatioClass = viewMode === 'full' ? 'aspect-[5/6]' : viewMode === 'penalty' ? 'aspect-[3/2]' : 'aspect-[5/3]';
 
-  // Arrow sizing logic
-  // Standard Width: 1.2. 20% smaller is ~0.96.
-  // Standard Marker: 4. 20% smaller is 3.2.
-  const arrowStrokeWidth = isSmallMode ? "0.96" : "1.2";
-  const markerSize = isSmallMode ? "3.2" : "4";
-  const markerViewBox = "0 0 4 4"; // Keep viewbox standard, scale via markerWidth/Height
-  const markerRefX = isSmallMode ? "2.5" : "3"; // Adjust ref to prevent gap since marker is smaller but path is same
+  // Arrow sizing logic (base values; per-arrow size scales these)
+  const arrowStrokeWidthBase = isSmallMode ? 0.96 : 1.2;
+  const markerSizeBase = isSmallMode ? 3.2 : 4;
+  const markerRefXBase = isSmallMode ? 2.5 : 3;
+  const markerViewBox = "0 0 4 4";
   
   return (
     <div 
       ref={containerRef}
-      className={`relative w-full ${aspectRatioClass} bg-green-700 rounded-lg overflow-hidden border-2 border-slate-600 shadow-2xl pitch-pattern transition-all duration-300 select-none`}
+      className={`relative w-full ${aspectRatioClass} bg-green-700 rounded-lg overflow-hidden border-2 border-slate-600 shadow-2xl pitch-pattern transition-all duration-300 select-none ${(arrowDrawingMode || placedPlayerDrawingMode || elementPlacementMode) ? 'cursor-crosshair' : ''}`}
       onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }}
       onDrop={handlePitchDrop}
       onMouseDown={handlePitchClick}
@@ -349,7 +831,18 @@ export const Pitch: React.FC<PitchProps> = ({
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
     >
-      
+      {/* --- ALIGNMENT GUIDES (Figma-style) --- */}
+      {alignmentGuides && !isExport && (
+        <div className="absolute inset-0 pointer-events-none z-50">
+          {alignmentGuides.vertical != null && (
+            <div className="absolute top-0 bottom-0 w-0.5 bg-cyan-400/90 shadow-lg" style={{ left: `${alignmentGuides.vertical}%` }} />
+          )}
+          {alignmentGuides.horizontal != null && (
+            <div className="absolute left-0 right-0 h-0.5 bg-cyan-400/90 shadow-lg" style={{ top: `${alignmentGuides.horizontal}%` }} />
+          )}
+        </div>
+      )}
+
       {/* --- PITCH MARKINGS --- */}
       
       {viewMode === 'full' && (
@@ -386,20 +879,44 @@ export const Pitch: React.FC<PitchProps> = ({
         </>
       )}
 
+      {viewMode === 'penalty' && (
+        <>
+           <div className="absolute inset-0 border-2 border-white/20 m-2 rounded-sm pointer-events-none"></div>
+           <div className="absolute top-0 left-0 right-0 h-[2px] bg-white/20 m-2 mt-0 pointer-events-none"></div>
+           <div className="absolute top-2 left-[15%] right-[15%] h-[25%] border border-white/20 border-t-0 pointer-events-none"></div>
+           <div className="absolute top-2 left-[35%] right-[35%] h-[12%] border border-white/20 border-t-0 pointer-events-none"></div>
+        </>
+      )}
+
       {/* --- ZONES LAYER --- */}
-      {zones.map((zone) => (
+      {zones.map((zone) => {
+          const r = zone.radius ?? 10;
+          return (
          <div
             key={zone.id}
             className="absolute transform -translate-x-1/2 -translate-y-1/2 cursor-move z-10 group"
-            style={{ left: `${zone.x}%`, top: `${zone.y}%` }}
+            style={{
+                left: `${zone.x}%`,
+                top: `${zone.y}%`,
+                width: `${r * 2}%`,
+                aspectRatio: '1',
+                height: 'auto',
+            }}
             draggable={!isExport}
             onDragStart={(e) => handleZoneDragStart(e, zone.id)}
          >
-             <div className="w-20 h-20 rounded-full border-2 border-dashed border-yellow-300/60 bg-yellow-300/10 flex items-center justify-center">
-                 <div className="w-1 h-1 bg-yellow-300/50 rounded-full"></div>
+             <div className="w-full h-full rounded-full border-2 border-dashed border-yellow-300/60 bg-yellow-300/10 flex items-center justify-center relative">
+                 <div className="w-1 h-1 bg-yellow-300/50 rounded-full" />
+                 {!isExport && onZoneResize && (
+                    <button
+                        type="button"
+                        className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-4 h-4 rounded-full bg-yellow-300 border border-yellow-100 shadow-md cursor-ew-resize opacity-0 group-hover:opacity-100 transition-opacity z-50"
+                        onMouseDown={(e) => handleZoneResizeMouseDown(e, zone.id)}
+                        draggable={false}
+                        title="Drag to resize"
+                    />
+                 )}
              </div>
-             
-             {/* Delete Zone */}
              {!isExport && onZoneRemove && (
                  <div 
                      className="absolute top-0 right-0 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity shadow-md z-40 hover:bg-red-600"
@@ -410,23 +927,40 @@ export const Pitch: React.FC<PitchProps> = ({
                  </div>
              )}
          </div>
-      ))}
+          );
+      })}
 
       {/* --- ARROWS LAYER (SVG) --- */}
       <svg className="absolute inset-0 w-full h-full pointer-events-none z-20" viewBox="0 0 100 100" preserveAspectRatio="none">
+        {/* Preview line (no per-arrow size) */}
+        {drawingArrow && <line x1={drawingArrow.startX} y1={drawingArrow.startY} x2={drawingArrow.endX} y2={drawingArrow.endY} stroke="#000" strokeWidth={arrowStrokeWidthBase} strokeDasharray={arrowDrawStyle === 'dashed' ? '2 1.5' : undefined} markerEnd={`url(#arrowhead-preview)`} />}
         <defs>
-            <marker id={`arrowhead-${isSmallMode ? 's' : 'l'}`} markerWidth={markerSize} markerHeight={markerSize} refX={markerRefX} refY="2" orient="auto" viewBox={markerViewBox}>
+            <marker id="arrowhead-preview" markerWidth={markerSizeBase} markerHeight={markerSizeBase} refX={markerRefXBase} refY="2" orient="auto" viewBox={markerViewBox}>
                 <path d="M0,0 L0,4 L4,2 z" fill="#000000" />
             </marker>
-             <marker id={`arrowhead-hover-${isSmallMode ? 's' : 'l'}`} markerWidth={markerSize} markerHeight={markerSize} refX={markerRefX} refY="2" orient="auto" viewBox={markerViewBox}>
-                <path d="M0,0 L0,4 L4,2 z" fill="#333333" />
-            </marker>
+            {arrows.map(arrow => {
+              const scale = typeof arrow.size === 'number' && arrow.size > 0 ? arrow.size : 1;
+              const mw = markerSizeBase * scale;
+              const refX = markerRefXBase * scale;
+              return (
+                <React.Fragment key={arrow.id}>
+                  <marker id={`arrowhead-${arrow.id}`} markerWidth={mw} markerHeight={mw} refX={refX} refY="2" orient="auto" viewBox={markerViewBox}>
+                    <path d="M0,0 L0,4 L4,2 z" fill="#000000" />
+                  </marker>
+                  <marker id={`arrowhead-hover-${arrow.id}`} markerWidth={mw} markerHeight={mw} refX={refX} refY="2" orient="auto" viewBox={markerViewBox}>
+                    <path d="M0,0 L0,4 L4,2 z" fill="#333333" />
+                  </marker>
+                </React.Fragment>
+              );
+            })}
         </defs>
         {arrows.map(arrow => {
             const isDragging = dragState?.id === arrow.id;
             const isSelected = selectedArrowId === arrow.id;
             const midX = (arrow.startX + arrow.endX) / 2;
             const midY = (arrow.startY + arrow.endY) / 2;
+            const arrowScale = typeof arrow.size === 'number' && arrow.size > 0 ? arrow.size : 1;
+            const strokeW = arrowStrokeWidthBase * arrowScale;
 
             const dx = arrow.endX - arrow.startX;
             const dy = arrow.endY - arrow.startY;
@@ -449,8 +983,9 @@ export const Pitch: React.FC<PitchProps> = ({
                     <line 
                         x1={arrow.startX} y1={arrow.startY} x2={arrow.endX} y2={arrow.endY} 
                         stroke={isDragging ? "#333333" : "#000000"} 
-                        strokeWidth={arrowStrokeWidth}
-                        markerEnd={isDragging ? `url(#arrowhead-hover-${isSmallMode ? 's' : 'l'})` : `url(#arrowhead-${isSmallMode ? 's' : 'l'})`}
+                        strokeWidth={strokeW}
+                        strokeDasharray={arrow.style === 'dashed' ? '2 1.5' : undefined}
+                        markerEnd={isDragging ? `url(#arrowhead-hover-${arrow.id})` : `url(#arrowhead-${arrow.id})`}
                         className="transition-colors pointer-events-none"
                     />
                     {isSelected && !isExport && (
@@ -507,13 +1042,151 @@ export const Pitch: React.FC<PitchProps> = ({
          </div>
       ))}
 
+      {/* --- GOALS LAYER --- */}
+      {goals.map((goal) => (
+         <div
+            key={goal.id}
+            className="absolute cursor-move z-10 group"
+            style={{ left: `${goal.x}%`, top: `${goal.y}%`, transform: `translate(-50%, -50%) scale(${scaleVal(goal.size)})` }}
+            draggable={!isExport}
+            onDragStart={(e) => handleGoalDragStart(e, goal.id)}
+            onClick={(e) => { e.stopPropagation(); onElementClick?.('goal', goal.id); }}
+         >
+             <div className="w-16 h-10 rounded-sm bg-white/95 border-2 border-slate-300 shadow-lg flex items-center justify-center">
+                 <div className="w-full h-full border-2 border-slate-400/50 rounded-sm m-0.5" style={{ backgroundImage: 'linear-gradient(45deg, #cbd5e1 25%, transparent 25%), linear-gradient(-45deg, #cbd5e1 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #cbd5e1 75%), linear-gradient(-45deg, transparent 75%, #cbd5e1 75%)', backgroundSize: '4px 4px', backgroundPosition: '0 0, 0 2px, 2px -2px, -2px 0px' }} />
+             </div>
+             {!isExport && onGoalRemove && (
+                 <div 
+                     className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity shadow-md z-40 hover:bg-red-600"
+                     onClick={(e) => { e.stopPropagation(); onGoalRemove(goal.id); }}
+                     title="Remove Goal"
+                 >
+                     <X size={8} className="text-white" />
+                 </div>
+             )}
+         </div>
+      ))}
+
+      {/* --- SMALL GOALS LAYER --- */}
+      {smallGoals.map((sg) => (
+         <div
+            key={sg.id}
+            className="absolute cursor-move z-10 group"
+            style={{ left: `${sg.x}%`, top: `${sg.y}%`, transform: `translate(-50%, -50%) scale(${scaleVal(sg.size)})` }}
+            draggable={!isExport}
+            onDragStart={(e) => handleSmallGoalDragStart(e, sg.id)}
+            onClick={(e) => { e.stopPropagation(); onElementClick?.('smallGoal', sg.id); }}
+         >
+             <div className="w-10 h-6 rounded bg-white/95 border-2 border-slate-300 shadow-md flex items-center justify-center">
+                 <div className="w-full h-full border border-slate-400/50 rounded m-0.5" style={{ backgroundImage: 'linear-gradient(45deg, #94a3b8 25%, transparent 25%), linear-gradient(-45deg, #94a3b8 25%, transparent 25%)', backgroundSize: '3px 3px' }} />
+             </div>
+             {!isExport && onSmallGoalRemove && (
+                 <div 
+                     className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full flex items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity shadow-md z-40 hover:bg-red-600"
+                     onClick={(e) => { e.stopPropagation(); onSmallGoalRemove(sg.id); }}
+                     title="Remove Small Goal"
+                 >
+                     <X size={6} className="text-white" />
+                 </div>
+             )}
+         </div>
+      ))}
+
+      {/* --- CONES (coaching equipment) --- */}
+      {cones.map((c) => (
+        <div key={c.id} className="absolute cursor-move z-10 group" style={{ left: `${c.x}%`, top: `${c.y}%`, transform: `translate(-50%, -50%) scale(${scaleVal(c.size)})` }} draggable={!isExport} onDragStart={(e) => handleConeDragStart(e, c.id)} onClick={(e) => { e.stopPropagation(); onElementClick?.('cone', c.id); }}>
+          <div className="w-4 h-5 bg-amber-400 border border-amber-600 shadow-md" style={{ clipPath: 'polygon(50% 0%, 100% 100%, 0% 100%)' }} />
+          {!isExport && onConeRemove && (
+            <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full flex items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity z-40 hover:bg-red-600" onClick={(e) => { e.stopPropagation(); onConeRemove(c.id); }} title="Remove cone"><X size={6} className="text-white" /></div>
+          )}
+        </div>
+      ))}
+
+      {/* --- MANNEQUINS --- */}
+      {mannequins.map((m) => (
+        <div key={m.id} className="absolute cursor-move z-10 group" style={{ left: `${m.x}%`, top: `${m.y}%`, transform: `translate(-50%, -50%) scale(${scaleVal(m.size)})` }} draggable={!isExport} onDragStart={(e) => handleMannequinDragStart(e, m.id)} onClick={(e) => { e.stopPropagation(); onElementClick?.('mannequin', m.id); }}>
+          <div className="w-5 h-8 rounded-sm bg-slate-600 border-2 border-slate-500 shadow-lg flex flex-col items-center justify-end pb-0.5">
+            <div className="w-4 h-3 rounded-full bg-slate-500 -mb-1" />
+            <div className="w-3 h-4 bg-slate-500 rounded-sm" />
+          </div>
+          {!isExport && onMannequinRemove && (
+            <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full flex items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity z-40 hover:bg-red-600" onClick={(e) => { e.stopPropagation(); onMannequinRemove(m.id); }} title="Remove mannequin"><X size={6} className="text-white" /></div>
+          )}
+        </div>
+      ))}
+
+      {/* --- GATES (passing gates) --- */}
+      {gates.map((g) => (
+        <div key={g.id} className="absolute cursor-move z-10 group" style={{ left: `${g.x}%`, top: `${g.y}%`, transform: `translate(-50%, -50%) scale(${scaleVal(g.size)})` }} draggable={!isExport} onDragStart={(e) => handleGateDragStart(e, g.id)} onClick={(e) => { e.stopPropagation(); onElementClick?.('gate', g.id); }}>
+          <div className="flex items-center justify-center gap-1">
+            <div className="w-1.5 h-8 bg-white border border-slate-300 rounded shadow" />
+            <div className="w-2 h-1 bg-transparent" />
+            <div className="w-1.5 h-8 bg-white border border-slate-300 rounded shadow" />
+          </div>
+          {!isExport && onGateRemove && (
+            <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full flex items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity z-40 hover:bg-red-600" onClick={(e) => { e.stopPropagation(); onGateRemove(g.id); }} title="Remove gate"><X size={6} className="text-white" /></div>
+          )}
+        </div>
+      ))}
+
+      {/* --- POLES --- */}
+      {poles.map((p) => (
+        <div key={p.id} className="absolute cursor-move z-10 group" style={{ left: `${p.x}%`, top: `${p.y}%`, transform: `translate(-50%, -50%) scale(${scaleVal(p.size)})` }} draggable={!isExport} onDragStart={(e) => handlePoleDragStart(e, p.id)} onClick={(e) => { e.stopPropagation(); onElementClick?.('pole', p.id); }}>
+          <div className="w-1.5 h-6 bg-white border border-slate-300 rounded shadow" />
+          {!isExport && onPoleRemove && (
+            <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full flex items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity z-40 hover:bg-red-600" onClick={(e) => { e.stopPropagation(); onPoleRemove(p.id); }} title="Remove pole"><X size={6} className="text-white" /></div>
+          )}
+        </div>
+      ))}
+
+      {/* --- LADDERS (agility ladder) --- */}
+      {ladders.map((l) => (
+        <div key={l.id} className="absolute cursor-move z-10 group" style={{ left: `${l.x}%`, top: `${l.y}%`, transform: `translate(-50%, -50%) scale(${scaleVal(l.size)})` }} draggable={!isExport} onDragStart={(e) => handleLadderDragStart(e, l.id)} onClick={(e) => { e.stopPropagation(); onElementClick?.('ladder', l.id); }}>
+          <div className="w-12 h-3 flex gap-0.5">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className="w-2 h-2.5 border-2 border-yellow-600 bg-yellow-400 rounded-sm" />
+            ))}
+          </div>
+          {!isExport && onLadderRemove && (
+            <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full flex items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity z-40 hover:bg-red-600" onClick={(e) => { e.stopPropagation(); onLadderRemove(l.id); }} title="Remove ladder"><X size={6} className="text-white" /></div>
+          )}
+        </div>
+      ))}
+
+      {/* --- PLACED PLAYERS (click-to-place, no number) --- */}
+      {placedPlayers.map((p) => (
+        <div
+          key={p.id}
+          className="absolute cursor-move z-10 group"
+          style={{ left: `${p.x}%`, top: `${p.y}%`, transform: `translate(-50%, -50%) scale(${scaleVal(p.size)})` }}
+          draggable={!isExport}
+          onDragStart={(e) => handlePlacedPlayerDragStart(e, p.id)}
+          onClick={(e) => { e.stopPropagation(); onElementClick?.('placedPlayer', p.id); }}
+        >
+          <div
+            className="w-6 h-6 rounded-full border-2 border-white shadow-lg flex items-center justify-center"
+            style={{ backgroundColor: p.color }}
+          />
+          {!isExport && onPlacedPlayerRemove && (
+            <div
+              className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full flex items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity z-40 hover:bg-red-600"
+              onClick={(e) => { e.stopPropagation(); onPlacedPlayerRemove(p.id); }}
+              title="Remove player"
+            >
+              <X size={6} className="text-white" />
+            </div>
+          )}
+        </div>
+      ))}
+
       {/* --- BALL --- */}
       {ballPosition && (
         <div
-          className="absolute transform -translate-x-1/2 -translate-y-1/2 cursor-move z-30 group"
-          style={{ left: `${ballPosition.x}%`, top: `${ballPosition.y}%` }}
+          className="absolute cursor-move z-30 group"
+          style={{ left: `${ballPosition.x}%`, top: `${ballPosition.y}%`, transform: `translate(-50%, -50%) scale(${scaleVal(ballPosition.size)})` }}
           draggable={!isExport}
           onDragStart={(e) => { e.dataTransfer.setData('type', 'ball'); e.stopPropagation(); }}
+          onClick={(e) => { e.stopPropagation(); onElementClick?.('ball'); }}
         >
            <div className="text-xl drop-shadow-md hover:scale-110 transition-transform">⚽</div>
            {!isExport && onBallRemove && (

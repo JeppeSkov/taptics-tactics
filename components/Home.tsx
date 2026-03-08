@@ -4,7 +4,7 @@ import { ArrowRight, LayoutGrid, Activity, Share2, Users, Shield, Swords, Calend
 
 interface HomeProps {
   onStart: () => void;
-  onNavigate: (page: 'home' | 'builder' | 'articles' | 'setpieces' | 'minutes') => void;
+  onNavigate: (page: 'home' | 'builder' | 'articles' | 'setpieces' | 'minutes' | 'drills') => void;
 }
 
 export const Home: React.FC<HomeProps> = ({ onStart, onNavigate }) => {

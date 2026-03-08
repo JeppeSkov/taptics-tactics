@@ -4,6 +4,7 @@ import { LineupBuilder } from './LineupBuilder';
 import { Home } from './components/Home';
 import { Articles } from './components/Articles';
 import { SetPieces } from './components/SetPieces';
+import { Drills } from './components/Drills';
 import { MinutesLog } from './components/MinutesLog';
 import { Player } from './types';
 import { MOCK_PLAYERS, STORAGE_KEY } from './constants';
@@ -16,7 +17,7 @@ declare global {
 }
 
 export default function App() {
-  const [page, setPage] = useState<'home' | 'builder' | 'articles' | 'setpieces' | 'minutes'>('home');
+  const [page, setPage] = useState<'home' | 'builder' | 'articles' | 'setpieces' | 'minutes' | 'drills'>('home');
 
   // --- Global Players State ---
   // We initialize from localStorage if available, otherwise use mocks.
@@ -105,6 +106,13 @@ export default function App() {
       )}
       {page === 'setpieces' && (
         <SetPieces 
+            onNavigate={(p) => setPage(p)} 
+            players={players}
+            setPlayers={handleUpdatePlayers}
+        />
+      )}
+      {page === 'drills' && (
+        <Drills 
             onNavigate={(p) => setPage(p)} 
             players={players}
             setPlayers={handleUpdatePlayers}

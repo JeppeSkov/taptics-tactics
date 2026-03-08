@@ -4,7 +4,7 @@ import { ArrowLeft, LayoutGrid, ArrowRight, Flag } from 'lucide-react';
 
 interface ArticlesProps {
   onBack: () => void;
-  onNavigate: (page: 'home' | 'builder' | 'setpieces' | 'minutes') => void;
+  onNavigate: (page: 'home' | 'builder' | 'setpieces' | 'articles' | 'minutes' | 'drills') => void;
 }
 
 export const Articles: React.FC<ArticlesProps> = ({ onBack, onNavigate }) => {

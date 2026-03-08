@@ -1,10 +1,10 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Menu, Home, LayoutGrid, Flag, Clock } from 'lucide-react';
+import { Menu, Home, LayoutGrid, Flag, Clock, Target } from 'lucide-react';
 
 interface NavMenuProps {
-  onNavigate: (page: 'home' | 'builder' | 'setpieces' | 'articles' | 'minutes') => void;
-  currentPage: 'home' | 'builder' | 'setpieces' | 'articles' | 'minutes';
+  onNavigate: (page: 'home' | 'builder' | 'setpieces' | 'articles' | 'minutes' | 'drills') => void;
+  currentPage: 'home' | 'builder' | 'setpieces' | 'articles' | 'minutes' | 'drills';
 }
 
 export const NavMenu: React.FC<NavMenuProps> = ({ onNavigate, currentPage }) => {
@@ -22,7 +22,7 @@ export const NavMenu: React.FC<NavMenuProps> = ({ onNavigate, currentPage }) => 
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleNav = (page: 'home' | 'builder' | 'setpieces' | 'articles' | 'minutes') => {
+  const handleNav = (page: 'home' | 'builder' | 'setpieces' | 'articles' | 'minutes' | 'drills') => {
     onNavigate(page);
     setIsOpen(false);
   };
@@ -58,6 +58,10 @@ export const NavMenu: React.FC<NavMenuProps> = ({ onNavigate, currentPage }) => 
             <button onClick={() => handleNav('setpieces')} className={itemClass('setpieces')}>
               <Flag size={16} />
               Set Pieces
+            </button>
+            <button onClick={() => handleNav('drills')} className={itemClass('drills')}>
+              <Target size={16} />
+              Drills
             </button>
             <button onClick={() => handleNav('minutes')} className={itemClass('minutes')}>
               <Clock size={16} />

@@ -52,7 +52,7 @@ const KIT_COLORS: KitColor[] = [
 ];
 
 interface LineupBuilderProps {
-  onNavigate: (page: 'home' | 'builder' | 'setpieces' | 'articles' | 'minutes') => void;
+  onNavigate: (page: 'home' | 'builder' | 'setpieces' | 'articles' | 'minutes' | 'drills') => void;
   globalPlayers: Player[];
   onGlobalPlayersUpdate: (newPlayers: Player[] | ((prev: Player[]) => Player[])) => void;
 }
@@ -140,22 +140,6 @@ export const LineupBuilder: React.FC<LineupBuilderProps> = ({
   const handleRemix = () => {
       setIsSharedMode(false);
       window.history.pushState({}, '', window.location.pathname);
-      
-      // Optionally populate local state with shared state if the user wants to "Remix"
-      if (sharedState) {
-        if (confirm("Do you want to overwrite your current draft with this shared lineup?")) {
-          setPlayers(sharedState.players);
-          // Assuming shared view provides a single snapshot, we apply it to possession view primarily
-          setSlotsInPossession(sharedState.slots);
-          setSlotsOutPossession(sharedState.slots);
-          setCurrentFormationInPossession(sharedState.formation);
-          setCurrentFormationOutPossession(sharedState.formation);
-          setKitColor(sharedState.kitColor);
-          setGameplan(sharedState.gameplan);
-          setNextMatch(sharedState.nextMatch);
-          setSubCount(sharedState.subCount || 7);
-        }
-      }
   };
 
   // --- Editor State (Initialized from LocalStorage or Defaults) ---
