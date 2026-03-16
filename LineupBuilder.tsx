@@ -6,8 +6,42 @@ import { Substitutes } from './components/Substitutes';
 import { SharedView } from './components/SharedView';
 import { NavMenu } from './components/NavMenu';
 import { Player, TacticalSlot } from './types';
-import { MOCK_PLAYERS, FORMATIONS_11, FORMATIONS_8, BENCH_SLOTS, STORAGE_KEY } from './constants';
+import { MOCK_PLAYERS, FORMATIONS_11, FORMATIONS_8, FORMATIONS_7, BENCH_SLOTS, STORAGE_KEY } from './constants';
 import { LayoutGrid, Users, MessageSquare, Calendar, Edit2, Check, X, Plus, Palette, Layers, ClipboardList, Link as LinkIcon, Eye, Shield, Swords, RotateCcw, ChevronLeft, ChevronDown, AlertTriangle, Share2, Copy } from 'lucide-react';
+
+// Unicode-safe Base64 encoding (mirrors SetPieces safeBtoa)
+const safeBtoa = (str: string) => {
+  try {
+    return btoa(
+      encodeURIComponent(str).replace(
+        /%([0-9A-F]{2})/g,
+        function toSolidBytes(match, p1) { // eslint-disable-line @typescript-eslint/no-unused-vars
+          return String.fromCharCode(parseInt(p1, 16));
+        },
+      ),
+    );
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.error('Encoding error', e);
+    return '';
+  }
+};
+
+// Unicode-safe Base64 decoding (mirrors SetPieces safeAtob)
+const safeAtob = (str: string) => {
+  try {
+    return decodeURIComponent(
+      atob(str)
+        .split('')
+        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join(''),
+    );
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.error('Decoding error', e);
+    return '';
+  }
+};
 
 interface NextMatch {
   opponent: string;
@@ -36,7 +70,7 @@ interface LineupDraft {
   kitColor: KitColor;
   gameplan: Gameplan;
   subCount: number;
-  teamSize: 11 | 8;
+  teamSize: 11 | 8 | 7;
 }
 
 const KIT_COLORS: KitColor[] = [
@@ -128,11 +162,15 @@ export const LineupBuilder: React.FC<LineupBuilderProps> = ({
       const dataParam = params.get('data');
       if (dataParam) {
           try {
-              const decoded = JSON.parse(atob(dataParam));
-              setSharedState(decoded);
-              setIsSharedMode(true);
+              const jsonString = safeAtob(dataParam);
+              if (jsonString) {
+                const decoded = JSON.parse(jsonString);
+                setSharedState(decoded);
+                setIsSharedMode(true);
+              }
           } catch (e) {
-              console.error("Failed to parse shared data", e);
+              // eslint-disable-next-line no-console
+              console.error('Failed to parse shared lineup data', e);
           }
       }
   }, []);
@@ -150,7 +188,7 @@ export const LineupBuilder: React.FC<LineupBuilderProps> = ({
   const [tacticalPhase, setTacticalPhase] = useState<'in_possession' | 'out_possession'>(savedState?.tacticalPhase || 'in_possession');
 
   // Team Size State
-  const [teamSize, setTeamSize] = useState<11 | 8>(savedState?.teamSize || 11);
+  const [teamSize, setTeamSize] = useState<11 | 8 | 7>(savedState?.teamSize || 11);
   const [isSizeDropdownOpen, setIsSizeDropdownOpen] = useState(false);
 
   // Note: 'players' state is now managed by App.tsx and passed as prop
@@ -185,7 +223,10 @@ export const LineupBuilder: React.FC<LineupBuilderProps> = ({
   const [isShareDropdownOpen, setIsShareDropdownOpen] = useState(false);
 
   // Computed Values
-  const availableFormations = teamSize === 11 ? FORMATIONS_11 : FORMATIONS_8;
+  const availableFormations =
+    teamSize === 11 ? FORMATIONS_11 :
+    teamSize === 8 ? FORMATIONS_8 :
+    FORMATIONS_7;
 
   // Persistence Effect
   useEffect(() => {
@@ -274,7 +315,7 @@ export const LineupBuilder: React.FC<LineupBuilderProps> = ({
           let s = fromSlots.find(slot => slot.id === slotId);
           // Fallback: Check global formation definitions if the player was assigned to a slot not currently visible
           if (!s && slotId) {
-             const allFormations = { ...FORMATIONS_11, ...FORMATIONS_8 };
+             const allFormations = { ...FORMATIONS_11, ...FORMATIONS_8, ...FORMATIONS_7 };
              for (const key in allFormations) {
                  const found = allFormations[key].find(fSlot => fSlot.id === slotId);
                  if (found) {
@@ -321,13 +362,16 @@ export const LineupBuilder: React.FC<LineupBuilderProps> = ({
       });
   };
 
-  const handleSizeChange = (newSize: 11 | 8) => {
+  const handleSizeChange = (newSize: 11 | 8 | 7) => {
     if (newSize === teamSize) {
       setIsSizeDropdownOpen(false);
       return;
     }
 
-    const newFormations = newSize === 11 ? FORMATIONS_11 : FORMATIONS_8;
+    const newFormations =
+      newSize === 11 ? FORMATIONS_11 :
+      newSize === 8 ? FORMATIONS_8 :
+      FORMATIONS_7;
     const defaultFormationName = Object.keys(newFormations)[0];
     const defaultFormationSlots = newFormations[defaultFormationName];
 
@@ -531,15 +575,26 @@ export const LineupBuilder: React.FC<LineupBuilderProps> = ({
         subCount
     };
     
-    const json = JSON.stringify(data);
-    const encoded = btoa(json);
-    const url = `${window.location.origin}${window.location.pathname}?data=${encoded}`;
-    
-    navigator.clipboard.writeText(url);
-    setCopyToastMessage('Public lineup link copied to clipboard!');
-    setShowCopyToast(true);
-    setTimeout(() => setShowCopyToast(false), 3000);
-    setIsShareWarningOpen(false);
+    try {
+      const json = JSON.stringify(data);
+      const encoded = safeBtoa(json);
+      if (!encoded) throw new Error('Encoding failed');
+
+      const url = `${window.location.origin}${window.location.pathname}?data=${encoded}`;
+      
+      navigator.clipboard.writeText(url);
+      setCopyToastMessage('Public lineup link copied to clipboard!');
+      setShowCopyToast(true);
+      setTimeout(() => setShowCopyToast(false), 3000);
+      setIsShareWarningOpen(false);
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to generate lineup link', e);
+      setCopyToastMessage('Error generating lineup link');
+      setShowCopyToast(true);
+      setTimeout(() => setShowCopyToast(false), 3000);
+      setIsShareWarningOpen(false);
+    }
   };
 
   const handleShareBuilder = () => {
@@ -699,6 +754,12 @@ export const LineupBuilder: React.FC<LineupBuilderProps> = ({
                                 className={`w-full text-left px-3 py-2 text-sm font-medium hover:bg-slate-700 transition-colors ${teamSize === 8 ? 'text-emerald-400 bg-slate-700/50' : 'text-slate-300'}`}
                             >
                                 8 v 8
+                            </button>
+                            <button 
+                                onClick={() => handleSizeChange(7)}
+                                className={`w-full text-left px-3 py-2 text-sm font-medium hover:bg-slate-700 transition-colors ${teamSize === 7 ? 'text-emerald-400 bg-slate-700/50' : 'text-slate-300'}`}
+                            >
+                                7 v 7
                             </button>
                         </div>
                     )}

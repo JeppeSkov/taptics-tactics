@@ -15,6 +15,14 @@ export interface PitchArrow {
   size?: number;
 }
 
+/** Training balls (Drills etc.) – supports multiple balls */
+export interface PitchBall {
+  id: string;
+  x: number;
+  y: number;
+  size?: number;
+}
+
 export interface PitchZone {
     id: string;
     x: number;
@@ -34,6 +42,8 @@ export interface PitchGoal {
     x: number;
     y: number;
     size?: number;
+    /** Rotation in degrees (0–359). */
+    rotation?: number;
 }
 
 export interface PitchSmallGoal {
@@ -41,6 +51,8 @@ export interface PitchSmallGoal {
     x: number;
     y: number;
     size?: number;
+    /** Rotation in degrees (0–359). */
+    rotation?: number;
 }
 
 /** Cone marker (Hudl/XPS-style equipment) */
@@ -65,6 +77,8 @@ export interface PitchGate {
     x: number;
     y: number;
     size?: number;
+    /** Rotation in degrees (0–359). */
+    rotation?: number;
 }
 
 /** Single pole / stick marker */
@@ -81,6 +95,8 @@ export interface PitchLadder {
     x: number;
     y: number;
     size?: number;
+    /** Rotation in degrees (0–359). */
+    rotation?: number;
 }
 
 /** Placed player marker (no number, click-to-place, color only) */
@@ -101,10 +117,17 @@ interface PitchProps {
   onNewPlayerDrop?: (playerId: string, x: number, y: number) => void;
   onRemovePlayer?: (playerId: string) => void;
   
-  // Ball Props
+  // Ball Props (legacy single-ball + multi-ball for drills)
+  /** Legacy single-ball position (used by Set Pieces / existing flows). */
   ballPosition?: { x: number, y: number; size?: number } | null;
+  /** Legacy single-ball move handler (no id – assumes only one ball). */
   onBallMove?: (x: number, y: number) => void;
+  /** Legacy single-ball remove handler. */
   onBallRemove?: () => void;
+  /** Optional multi-ball API (Drills). When provided, balls render in addition to any legacy single ball. */
+  balls?: PitchBall[];
+  onBallMoveById?: (id: string, x: number, y: number) => void;
+  onBallRemoveById?: (id: string) => void;
 
   // Arrow Props
   arrows?: PitchArrow[];
@@ -178,7 +201,7 @@ interface PitchProps {
   elementPlacementMode?: boolean;
   onElementPlace?: (x: number, y: number) => void;
 
-  /** Called when user clicks an element (for selection / size adjust). type + id (id undefined for ball). */
+  /** Called when user clicks an element (for selection / size adjust). type + id (id undefined for legacy single ball). */
   onElementClick?: (type: 'ball' | 'goal' | 'smallGoal' | 'cone' | 'mannequin' | 'gate' | 'pole' | 'ladder' | 'placedPlayer', id?: string) => void;
   /** Called when user clicks the pitch background (e.g. to deselect). */
   onPitchBackgroundClick?: () => void;
@@ -201,6 +224,9 @@ export const Pitch: React.FC<PitchProps> = ({
   ballPosition,
   onBallMove,
   onBallRemove,
+  balls = [],
+  onBallMoveById,
+  onBallRemoveById,
   arrows = [],
   onArrowUpdate,
   onNewArrowDrop,
@@ -275,6 +301,14 @@ export const Pitch: React.FC<PitchProps> = ({
     lastY: number;
   } | null>(null);
 
+  // -- Drag Logic for rotatable equipment (goals, small goals, gates, ladders) --
+  const [equipmentDrag, setEquipmentDrag] = useState<{
+    kind: 'goal' | 'smallGoal' | 'gate' | 'ladder';
+    id: string;
+    offsetX: number;
+    offsetY: number;
+  } | null>(null);
+
   // Track selected arrow to show handles/delete button
   const [selectedArrowId, setSelectedArrowId] = useState<string | null>(null);
   // Drag-to-draw arrow (start on mousedown, end on mouseup)
@@ -302,7 +336,10 @@ export const Pitch: React.FC<PitchProps> = ({
       }
     };
     slots.forEach(s => add(s.x, s.y));
+    // Legacy single ball
     if (ballPosition) add(ballPosition.x, ballPosition.y);
+    // Multi-balls (Drills)
+    balls.forEach(b => add(b.x, b.y));
     goals.forEach(g => add(g.x, g.y));
     smallGoals.forEach(sg => add(sg.x, sg.y));
     cones.forEach(c => add(c.x, c.y));
@@ -364,6 +401,13 @@ export const Pitch: React.FC<PitchProps> = ({
         const raw = calculateCoords(e);
         const getExcludeSlot = (): { x: number; y: number } | undefined => {
           if (type === 'ball' && ballPosition) return ballPosition;
+          if (type === 'ball-multi') {
+            const ballId = e.dataTransfer.getData('ballId');
+            if (ballId) {
+              const b = balls.find(bb => bb.id === ballId);
+              if (b) return { x: b.x, y: b.y };
+            }
+          }
           const zoneId = e.dataTransfer.getData('zoneId');
           if (zoneId) { const z = zones.find(zo => zo.id === zoneId); return z ? { x: z.x, y: z.y } : undefined; }
           const oppId = e.dataTransfer.getData('opponentId');
@@ -389,6 +433,10 @@ export const Pitch: React.FC<PitchProps> = ({
         const excl = getExcludeSlot();
         const { x, y } = applyAlignment(raw.x, raw.y, excl?.x, excl?.y);
         if (type === 'ball' && onBallMove) onBallMove(x, y);
+        if (type === 'ball-multi' && onBallMoveById) {
+          const ballId = e.dataTransfer.getData('ballId');
+          if (ballId) onBallMoveById(ballId, x, y);
+        }
         if (type === 'zone' && onZoneMove) {
              const zoneId = e.dataTransfer.getData('zoneId');
              if(zoneId) onZoneMove(zoneId, x, y);
@@ -491,8 +539,13 @@ export const Pitch: React.FC<PitchProps> = ({
     const ladderId = e.dataTransfer.getData('ladderId');
     const playerId = e.dataTransfer.getData('playerId');
     const placedPlayerId = e.dataTransfer.getData('placedPlayerId');
+    const ballId = e.dataTransfer.getData('ballId');
     const getExclude = (): { x: number; y: number } | undefined => {
       if (type === 'ball' && ballPosition) return ballPosition;
+      if (type === 'ball-multi' && ballId) {
+        const b = balls.find(bb => bb.id === ballId);
+        if (b) return { x: b.x, y: b.y };
+      }
       if (slotId) { const s = slots.find(sl => sl.id === slotId); return s ? { x: s.x, y: s.y } : undefined; }
       if (zoneId) { const z = zones.find(zo => zo.id === zoneId); return z ? { x: z.x, y: z.y } : undefined; }
       if (opponentId) { const o = opponents.find(op => op.id === opponentId); return o ? { x: o.x, y: o.y } : undefined; }
@@ -509,9 +562,14 @@ export const Pitch: React.FC<PitchProps> = ({
     const excl = getExclude();
     const { x, y } = applyAlignment(raw.x, raw.y, excl?.x, excl?.y);
 
-    // Handle Ball Drop
+    // Handle Ball Drop (legacy single ball)
     if (type === 'ball' && onBallMove) {
         onBallMove(x, y);
+        return;
+    }
+    // Handle multi-ball Drop (Drills)
+    if (type === 'ball-multi' && onBallMoveById && ballId) {
+        onBallMoveById(ballId, x, y);
         return;
     }
 
@@ -635,7 +693,7 @@ export const Pitch: React.FC<PitchProps> = ({
       e.dataTransfer.setData('type', 'goal');
       e.stopPropagation();
   };
-
+ 
   const handleSmallGoalDragStart = (e: React.DragEvent, smallGoalId: string) => {
       e.dataTransfer.setData('smallGoalId', smallGoalId);
       e.dataTransfer.setData('type', 'smallGoal');
@@ -693,6 +751,46 @@ export const Pitch: React.FC<PitchProps> = ({
     setDragState({ type: 'arrow', id, mode, lastX: startX, lastY: startY });
   };
 
+  // Start dragging a rotatable equipment element (goal, smallGoal, gate, ladder)
+  const handleEquipmentMouseDown = (
+    e: React.MouseEvent,
+    kind: 'goal' | 'smallGoal' | 'gate' | 'ladder',
+    id: string,
+  ) => {
+    if (isExport) return;
+    e.stopPropagation();
+    e.preventDefault();
+    if (!containerRef.current) return;
+
+    const { x: mouseX, y: mouseY } = getPct(e);
+    let elemX = 0;
+    let elemY = 0;
+    if (kind === 'goal') {
+      const g = goals.find(goal => goal.id === id);
+      if (!g) return;
+      elemX = g.x; elemY = g.y;
+    } else if (kind === 'smallGoal') {
+      const sg = smallGoals.find(goal => goal.id === id);
+      if (!sg) return;
+      elemX = sg.x; elemY = sg.y;
+    } else if (kind === 'gate') {
+      const g = gates.find(gate => gate.id === id);
+      if (!g) return;
+      elemX = g.x; elemY = g.y;
+    } else if (kind === 'ladder') {
+      const l = ladders.find(ladder => ladder.id === id);
+      if (!l) return;
+      elemX = l.x; elemY = l.y;
+    }
+
+    setEquipmentDrag({
+      kind,
+      id,
+      offsetX: mouseX - elemX,
+      offsetY: mouseY - elemY,
+    });
+  };
+
   const getPct = (e: { clientX: number; clientY: number }) => {
       if (!containerRef.current) return { x: 0, y: 0 };
       const rect = containerRef.current.getBoundingClientRect();
@@ -736,6 +834,24 @@ export const Pitch: React.FC<PitchProps> = ({
           return;
       }
 
+      // Dragging equipment (goals, small goals, gates, ladders)
+      if (equipmentDrag) {
+        const { x: rawX, y: rawY } = getPct(e);
+        const newX = Math.max(0, Math.min(100, rawX - equipmentDrag.offsetX));
+        const newY = Math.max(0, Math.min(100, rawY - equipmentDrag.offsetY));
+
+        if (equipmentDrag.kind === 'goal' && onGoalMove) {
+          onGoalMove(equipmentDrag.id, newX, newY);
+        } else if (equipmentDrag.kind === 'smallGoal' && onSmallGoalMove) {
+          onSmallGoalMove(equipmentDrag.id, newX, newY);
+        } else if (equipmentDrag.kind === 'gate' && onGateMove) {
+          onGateMove(equipmentDrag.id, newX, newY);
+        } else if (equipmentDrag.kind === 'ladder' && onLadderMove) {
+          onLadderMove(equipmentDrag.id, newX, newY);
+        }
+        return;
+      }
+
       // General mouse move for Arrow dragging (handled at container level to catch fast movements)
       if (!dragState || !onArrowUpdate || !arrows) return;
 
@@ -775,6 +891,7 @@ export const Pitch: React.FC<PitchProps> = ({
       }
       setDragState(null);
       setZoneResizeState(null);
+      setEquipmentDrag(null);
   };
 
   const handleZoneResizeMouseDown = (e: React.MouseEvent, zoneId: string) => {
@@ -1047,13 +1164,23 @@ export const Pitch: React.FC<PitchProps> = ({
          <div
             key={goal.id}
             className="absolute cursor-move z-10 group"
-            style={{ left: `${goal.x}%`, top: `${goal.y}%`, transform: `translate(-50%, -50%) scale(${scaleVal(goal.size)})` }}
-            draggable={!isExport}
-            onDragStart={(e) => handleGoalDragStart(e, goal.id)}
+            style={{
+              left: `${goal.x}%`,
+              top: `${goal.y}%`,
+              transform: `translate(-50%, -50%) rotate(${goal.rotation ?? 0}deg) scale(${scaleVal(goal.size)})`,
+            }}
+            onMouseDown={(e) => handleEquipmentMouseDown(e, 'goal', goal.id)}
             onClick={(e) => { e.stopPropagation(); onElementClick?.('goal', goal.id); }}
          >
-             <div className="w-16 h-10 rounded-sm bg-white/95 border-2 border-slate-300 shadow-lg flex items-center justify-center">
-                 <div className="w-full h-full border-2 border-slate-400/50 rounded-sm m-0.5" style={{ backgroundImage: 'linear-gradient(45deg, #cbd5e1 25%, transparent 25%), linear-gradient(-45deg, #cbd5e1 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #cbd5e1 75%), linear-gradient(-45deg, transparent 75%, #cbd5e1 75%)', backgroundSize: '4px 4px', backgroundPosition: '0 0, 0 2px, 2px -2px, -2px 0px' }} />
+             <div className="w-16 h-10 rounded-sm border-2 border-slate-300 shadow-lg flex items-center justify-center bg-transparent">
+               <div
+                 className="w-full h-full border-2 border-slate-400/60 rounded-sm m-0.5 bg-transparent"
+                 style={{
+                   backgroundImage: 'linear-gradient(45deg, #cbd5e1 25%, transparent 25%), linear-gradient(-45deg, #cbd5e1 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #cbd5e1 75%), linear-gradient(-45deg, transparent 75%, #cbd5e1 75%)',
+                   backgroundSize: '4px 4px',
+                   backgroundPosition: '0 0, 0 2px, 2px -2px, -2px 0px',
+                 }}
+               />
              </div>
              {!isExport && onGoalRemove && (
                  <div 
@@ -1072,13 +1199,22 @@ export const Pitch: React.FC<PitchProps> = ({
          <div
             key={sg.id}
             className="absolute cursor-move z-10 group"
-            style={{ left: `${sg.x}%`, top: `${sg.y}%`, transform: `translate(-50%, -50%) scale(${scaleVal(sg.size)})` }}
-            draggable={!isExport}
-            onDragStart={(e) => handleSmallGoalDragStart(e, sg.id)}
+            style={{
+              left: `${sg.x}%`,
+              top: `${sg.y}%`,
+              transform: `translate(-50%, -50%) rotate(${sg.rotation ?? 0}deg) scale(${scaleVal(sg.size)})`,
+            }}
+            onMouseDown={(e) => handleEquipmentMouseDown(e, 'smallGoal', sg.id)}
             onClick={(e) => { e.stopPropagation(); onElementClick?.('smallGoal', sg.id); }}
          >
-             <div className="w-10 h-6 rounded bg-white/95 border-2 border-slate-300 shadow-md flex items-center justify-center">
-                 <div className="w-full h-full border border-slate-400/50 rounded m-0.5" style={{ backgroundImage: 'linear-gradient(45deg, #94a3b8 25%, transparent 25%), linear-gradient(-45deg, #94a3b8 25%, transparent 25%)', backgroundSize: '3px 3px' }} />
+             <div className="w-10 h-6 rounded border-2 border-slate-300 shadow-md flex items-center justify-center bg-transparent">
+               <div
+                 className="w-full h-full border border-slate-400/60 rounded m-0.5 bg-transparent"
+                 style={{
+                   backgroundImage: 'linear-gradient(45deg, #94a3b8 25%, transparent 25%), linear-gradient(-45deg, #94a3b8 25%, transparent 25%)',
+                   backgroundSize: '3px 3px',
+                 }}
+               />
              </div>
              {!isExport && onSmallGoalRemove && (
                  <div 
@@ -1117,11 +1253,22 @@ export const Pitch: React.FC<PitchProps> = ({
 
       {/* --- GATES (passing gates) --- */}
       {gates.map((g) => (
-        <div key={g.id} className="absolute cursor-move z-10 group" style={{ left: `${g.x}%`, top: `${g.y}%`, transform: `translate(-50%, -50%) scale(${scaleVal(g.size)})` }} draggable={!isExport} onDragStart={(e) => handleGateDragStart(e, g.id)} onClick={(e) => { e.stopPropagation(); onElementClick?.('gate', g.id); }}>
+        <div
+          key={g.id}
+          className="absolute cursor-move z-10 group"
+          style={{ left: `${g.x}%`, top: `${g.y}%`, transform: `translate(-50%, -50%) scale(${scaleVal(g.size)})` }}
+          onMouseDown={(e) => handleEquipmentMouseDown(e, 'gate', g.id)}
+          onClick={(e) => { e.stopPropagation(); onElementClick?.('gate', g.id); }}
+        >
+          <div
+            className="relative"
+            style={{ transform: `rotate(${g.rotation ?? 0}deg)` }}
+          >
           <div className="flex items-center justify-center gap-1">
             <div className="w-1.5 h-8 bg-white border border-slate-300 rounded shadow" />
             <div className="w-2 h-1 bg-transparent" />
             <div className="w-1.5 h-8 bg-white border border-slate-300 rounded shadow" />
+          </div>
           </div>
           {!isExport && onGateRemove && (
             <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full flex items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity z-40 hover:bg-red-600" onClick={(e) => { e.stopPropagation(); onGateRemove(g.id); }} title="Remove gate"><X size={6} className="text-white" /></div>
@@ -1141,8 +1288,21 @@ export const Pitch: React.FC<PitchProps> = ({
 
       {/* --- LADDERS (agility ladder) --- */}
       {ladders.map((l) => (
-        <div key={l.id} className="absolute cursor-move z-10 group" style={{ left: `${l.x}%`, top: `${l.y}%`, transform: `translate(-50%, -50%) scale(${scaleVal(l.size)})` }} draggable={!isExport} onDragStart={(e) => handleLadderDragStart(e, l.id)} onClick={(e) => { e.stopPropagation(); onElementClick?.('ladder', l.id); }}>
-          <div className="w-12 h-3 flex gap-0.5">
+        <div
+          key={l.id}
+          className="absolute cursor-move z-10 group"
+          style={{
+            left: `${l.x}%`,
+            top: `${l.y}%`,
+            transform: `translate(-50%, -50%) scale(${scaleVal(l.size)})`,
+          }}
+          onMouseDown={(e) => handleEquipmentMouseDown(e, 'ladder', l.id)}
+          onClick={(e) => { e.stopPropagation(); onElementClick?.('ladder', l.id); }}
+        >
+          <div
+            className="w-12 h-3 flex gap-0.5"
+            style={{ transform: `rotate(${l.rotation ?? 0}deg)` }}
+          >
             {[1, 2, 3, 4, 5].map((i) => (
               <div key={i} className="w-2 h-2.5 border-2 border-yellow-600 bg-yellow-400 rounded-sm" />
             ))}
@@ -1179,7 +1339,30 @@ export const Pitch: React.FC<PitchProps> = ({
         </div>
       ))}
 
-      {/* --- BALL --- */}
+      {/* --- MULTI BALLS (Drills) --- */}
+      {balls.map((b) => (
+        <div
+          key={b.id}
+          className="absolute cursor-move z-30 group"
+          style={{ left: `${b.x}%`, top: `${b.y}%`, transform: `translate(-50%, -50%) scale(${scaleVal(b.size)})` }}
+          draggable={!isExport}
+          onDragStart={(e) => { e.dataTransfer.setData('type', 'ball-multi'); e.dataTransfer.setData('ballId', b.id); e.stopPropagation(); }}
+          onClick={(e) => { e.stopPropagation(); onElementClick?.('ball', b.id); }}
+        >
+          <div className="text-xl drop-shadow-md hover:scale-110 transition-transform">⚽</div>
+          {!isExport && onBallRemoveById && (
+            <div 
+              className="absolute -top-3 -right-3 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity shadow-md z-40 hover:bg-red-600"
+              onClick={(e) => { e.stopPropagation(); onBallRemoveById(b.id); }}
+              title="Remove ball"
+            >
+              <X size={8} className="text-white" />
+            </div>
+          )}
+        </div>
+      ))}
+
+      {/* --- LEGACY SINGLE BALL (Set Pieces etc.) --- */}
       {ballPosition && (
         <div
           className="absolute cursor-move z-30 group"

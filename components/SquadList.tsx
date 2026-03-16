@@ -230,6 +230,8 @@ export const SquadList: React.FC<SquadListProps> = ({
     let positionLabel = label || slotId;
     if (!label && slotDef && slotDef.label === 'SP') {
         positionLabel = (index + 1).toString();
+    } else if (slotDef?.id?.startsWith('drill-')) {
+        positionLabel = 'Pitch';
     } else if (slotDef) {
         positionLabel = slotDef.id; // Use ID (e.g. "GK") instead of label (e.g. "Goalkeeper")
     }

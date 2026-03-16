@@ -1,6 +1,7 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { ArrowRight, LayoutGrid, Activity, Share2, Users, Shield, Swords, Calendar, Flag } from 'lucide-react';
+import { useAuth } from '../supabaseAuth';
 
 interface HomeProps {
   onStart: () => void;
@@ -8,6 +9,14 @@ interface HomeProps {
 }
 
 export const Home: React.FC<HomeProps> = ({ onStart, onNavigate }) => {
+  const { user, loading, signIn, signUp, signOut } = useAuth();
+  const [mode, setMode] = useState<'login' | 'signup'>('login');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+   const [authOpen, setAuthOpen] = useState(false);
+
   const scrollToFeatures = (e: React.MouseEvent) => {
     e.preventDefault();
     const element = document.getElementById('features');
@@ -51,12 +60,132 @@ export const Home: React.FC<HomeProps> = ({ onStart, onNavigate }) => {
              Articles
            </a>
         </nav>
-        <button 
-          onClick={onStart}
-          className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-lg text-sm font-bold border border-slate-700 transition-all shadow-lg"
-        >
-          Launch Builder
-        </button>
+        <div className="flex items-center gap-3 relative">
+          {!loading && user && (
+            <div className="hidden sm:flex flex-col items-end text-[11px] text-slate-400 mr-2">
+              <span className="font-semibold text-slate-200">Signed in</span>
+              <span className="truncate max-w-[160px]">{user.email}</span>
+            </div>
+          )}
+          <button 
+            onClick={onStart}
+            className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-lg text-sm font-bold border border-slate-700 transition-all shadow-lg"
+          >
+            Launch Builder
+          </button>
+          {!loading && !user && (
+            <button
+              type="button"
+              onClick={() => {
+                setError(null);
+                setAuthOpen(prev => !prev);
+              }}
+              className="bg-transparent hover:bg-slate-800 text-slate-200 px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-700 transition-all"
+            >
+              Sign in
+            </button>
+          )}
+
+          {/* Auth dropdown */}
+          {!loading && !user && authOpen && (
+            <div className="absolute right-0 top-full mt-2 w-72 bg-slate-950/95 border border-slate-800 rounded-xl p-4 shadow-2xl z-50 text-left">
+              <div className="flex items-center justify-between mb-2">
+                <h2 className="text-xs font-semibold text-slate-200">
+                  {mode === 'login' ? 'Log in to save your work' : 'Create a free account'}
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setError(null);
+                    setMode(prev => (prev === 'login' ? 'signup' : 'login'));
+                  }}
+                  className="text-[10px] text-emerald-400 hover:text-emerald-300 underline-offset-2 hover:underline"
+                >
+                  {mode === 'login' ? 'Need an account?' : 'Already have an account?'}
+                </button>
+              </div>
+              <form
+                className="space-y-2"
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  setSubmitting(true);
+                  setError(null);
+                  try {
+                    if (mode === 'login') {
+                      await signIn(email, password);
+                    } else {
+                      await signUp(email, password);
+                    }
+                    setAuthOpen(false);
+                  } catch (err: any) {
+                    setError(err?.message || 'Something went wrong');
+                  } finally {
+                    setSubmitting(false);
+                  }
+                }}
+              >
+                <div className="flex flex-col gap-1 text-left">
+                  <label className="text-[10px] font-semibold text-slate-300">Email</label>
+                  <input
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full rounded-md bg-slate-950/60 border border-slate-700 px-2 py-1.5 text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
+                    placeholder="you@club.com"
+                  />
+                </div>
+                <div className="flex flex-col gap-1 text-left">
+                  <label className="text-[10px] font-semibold text-slate-300">Password</label>
+                  <input
+                    type="password"
+                    required
+                    minLength={6}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full rounded-md bg-slate-950/60 border border-slate-700 px-2 py-1.5 text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
+                    placeholder="Min. 6 characters"
+                  />
+                </div>
+                {error && (
+                  <p className="text-[10px] text-red-400">
+                    {error}
+                  </p>
+                )}
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="w-full mt-1 inline-flex items-center justify-center rounded-md bg-slate-800 hover:bg-slate-700 disabled:opacity-60 disabled:cursor-not-allowed px-2 py-1.5 text-[11px] font-semibold text-slate-100 border border-slate-700 transition-colors"
+                >
+                  {submitting
+                    ? (mode === 'login' ? 'Logging in…' : 'Creating account…')
+                    : (mode === 'login' ? 'Log in' : 'Sign up')}
+                </button>
+                <p className="text-[9px] text-slate-500 mt-1">
+                  Use this account to sync squads, lineups, set pieces and drills across devices later.
+                </p>
+              </form>
+            </div>
+          )}
+
+          {/* Signed-in header actions */}
+          {!loading && user && (
+            <button
+              type="button"
+              onClick={async () => {
+                setError(null);
+                try {
+                  await signOut();
+                } catch (err: any) {
+                  setError(err?.message || 'Failed to sign out');
+                }
+              }}
+              className="bg-transparent hover:bg-slate-800 text-slate-200 px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-700 transition-all"
+            >
+              Sign out
+            </button>
+          )}
+        </div>
       </header>
 
       {/* Hero Section */}
@@ -76,10 +205,10 @@ export const Home: React.FC<HomeProps> = ({ onStart, onNavigate }) => {
           The modern tactical playground for football minds. Build detailed squads, design complex gameplans, and share your vision with your squad or coaching staff.
         </p>
 
-        <div className="flex flex-col sm:flex-row gap-4 w-full justify-center max-w-md mx-auto mb-32">
+        <div className="flex flex-col lg:flex-row gap-8 w-full justify-center max-w-5xl mx-auto mb-32 items-start">
            <button 
              onClick={onStart}
-             className="group relative flex items-center justify-center gap-3 bg-emerald-600 hover:bg-emerald-500 text-white px-8 py-4 rounded-xl text-lg font-bold shadow-2xl shadow-emerald-900/50 transition-all transform hover:-translate-y-1"
+            className="group relative flex items-center justify-center gap-3 bg-emerald-600 hover:bg-emerald-500 text-white px-8 py-4 rounded-xl text-lg font-bold shadow-2xl shadow-emerald-900/50 transition-all transform hover:-translate-y-1 w-full lg:w-auto"
            >
              Start Building
              <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />

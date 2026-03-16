@@ -1,11 +1,13 @@
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { NavMenu } from './NavMenu';
 import { SquadList } from './SquadList';
 import { Pitch, PitchArrow, PitchZone, PitchOpponent } from './Pitch';
 import { SetPieceSharedView, SharedSetPiecePayload } from './SetPieceSharedView';
 import { Player, TacticalSlot } from '../types';
 import { STORAGE_KEY } from '../constants';
+import { useAuth } from '../supabaseAuth';
+import { fetchSetPiecesForUser, saveSetPiecesForUser } from '../supabaseSetPieces';
 import { Flag, Users, Trash2, Palette, ChevronDown, CornerUpRight, Shield, MoveRight, User, CircleDashed, ClipboardEdit, Save, Play, Clock, Layout, X, AlertTriangle, Check, RefreshCw, Plus, Share2, Copy, Link as LinkIcon, ZoomIn, ZoomOut, Eye, Send, Undo2 } from 'lucide-react';
 
 interface SetPiecesProps {
@@ -109,6 +111,8 @@ export const SetPieces: React.FC<SetPiecesProps> = ({
     players: globalPlayers, 
     setPlayers: updateGlobalPlayers 
 }) => {
+  const { user } = useAuth();
+
   // --- Shared View Logic ---
   const [isSharedMode, setIsSharedMode] = useState(false);
   const [sharedPayload, setSharedPayload] = useState<SharedSetPiecePayload | null>(null);
@@ -201,6 +205,7 @@ export const SetPieces: React.FC<SetPiecesProps> = ({
   const [selectedArrowId, setSelectedArrowId] = useState<string | null>(null);
 
   const [deleteRoutineId, setDeleteRoutineId] = useState<string | null>(null);
+  const appliedRemoteSetPiecesRef = useRef<string | null>(null);
 
   const takeSnapshot = useCallback((): SetPiecesSnapshot => ({
     slots: slots.map(s => ({ ...s })),
@@ -249,6 +254,59 @@ export const SetPieces: React.FC<SetPiecesProps> = ({
     setPlan(s.plan);
     setHistory(prev => prev.slice(0, -1));
   }, [history.length]);
+
+  // Load set pieces from Supabase when user is logged in (once per user per session)
+  useEffect(() => {
+    if (!user?.id || isSharedMode) return;
+    if (appliedRemoteSetPiecesRef.current === user.id) return;
+
+    let cancelled = false;
+    (async () => {
+      const payload = await fetchSetPiecesForUser(user.id);
+      if (cancelled || !payload) return;
+
+      const data = payload.setPiecesData as Record<ScenarioType, ScenarioData>;
+      const scenarioKey = payload.setPiecesCurrentScenario as ScenarioType;
+      const current = data?.[scenarioKey];
+
+      appliedRemoteSetPiecesRef.current = user.id;
+
+      const emptyScenarios: Record<ScenarioType, ScenarioData> = {
+        offensive: { slots: [], assignments: {}, roles: {}, ballPosition: null, arrows: [], zones: [], opponents: [], notes: '', plan: '' },
+        defensive: { slots: [], assignments: {}, roles: {}, ballPosition: null, arrows: [], zones: [], opponents: [], notes: '', plan: '' },
+      };
+      setScenariosData(data ?? emptyScenarios);
+      setScenario(scenarioKey);
+      setKitColor(payload.setPiecesKitColor ?? KIT_COLORS[0]);
+      setSavedRoutines(payload.savedRoutines as SavedRoutine[]);
+      if (current) {
+        setSlots(current.slots ?? []);
+        setCurrentAssignments(current.assignments ?? {});
+        setCurrentRoles(current.roles ?? {});
+        setBallPosition(current.ballPosition ?? null);
+        setArrows(current.arrows ?? []);
+        setZones(current.zones ?? []);
+        setOpponents(current.opponents ?? []);
+        setNotes(current.notes ?? '');
+        setPlan(current.plan ?? '');
+      }
+
+      try {
+        const existing = localStorage.getItem(STORAGE_KEY);
+        const parsed = existing ? JSON.parse(existing) : {};
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({
+          ...parsed,
+          setPiecesData: data,
+          setPiecesCurrentScenario: scenarioKey,
+          setPiecesKitColor: payload.setPiecesKitColor,
+          savedRoutines: payload.savedRoutines,
+        }));
+      } catch (e) {
+        console.error('Failed to cache set pieces locally', e);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user?.id, isSharedMode]);
 
   // Toast State
   const [toast, setToast] = useState<{ message: string, visible: boolean }>({ message: '', visible: false });
@@ -299,16 +357,25 @@ export const SetPieces: React.FC<SetPiecesProps> = ({
             setPiecesData: fullScenariosData,
             setPiecesCurrentScenario: scenario,
             setPiecesKitColor: kitColor,
-            savedRoutines: savedRoutines // Save list of routines
+            savedRoutines: savedRoutines
         };
-        
+
         localStorage.setItem(STORAGE_KEY, JSON.stringify(newState));
+
+        if (user?.id) {
+            saveSetPiecesForUser(user.id, {
+                setPiecesData: fullScenariosData,
+                setPiecesCurrentScenario: scenario,
+                setPiecesKitColor: kitColor,
+                savedRoutines,
+            }).catch((err) => console.error('[Supabase] Set pieces save failed:', err?.message ?? err));
+        }
     } catch (e) {
         console.error("Failed to save set pieces", e);
     }
   }, [
       slots, currentAssignments, currentRoles, ballPosition, arrows, zones, opponents, notes, plan,
-      scenario, scenariosData, kitColor, savedRoutines, isSharedMode
+      scenario, scenariosData, kitColor, savedRoutines, isSharedMode, user?.id
   ]);
 
   // Helper to switch scenario
@@ -1028,7 +1095,7 @@ export const SetPieces: React.FC<SetPiecesProps> = ({
                     title={savedRoutines.length >= 5 && !loadedRoutineId ? "Max 5 routines allowed" : "Save Routine"}
                 >
                     <Save size={16} />
-                    <span className="hidden sm:inline">{loadedRoutineId ? 'Update' : 'Save'}</span>
+                    <span className="hidden sm:inline">{loadedRoutineId ? 'Update/add new' : 'Save'}</span>
                 </button>
 
                 <button 

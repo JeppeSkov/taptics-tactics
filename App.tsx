@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { LineupBuilder } from './LineupBuilder';
 import { Home } from './components/Home';
 import { Articles } from './components/Articles';
@@ -8,6 +8,8 @@ import { Drills } from './components/Drills';
 import { MinutesLog } from './components/MinutesLog';
 import { Player } from './types';
 import { MOCK_PLAYERS, STORAGE_KEY } from './constants';
+import { useAuth } from './supabaseAuth';
+import { fetchPlayersForUser, savePlayersForUser } from './supabasePlayers';
 
 // Add type definition for Google Analytics
 declare global {
@@ -18,6 +20,8 @@ declare global {
 
 export default function App() {
   const [page, setPage] = useState<'home' | 'builder' | 'articles' | 'setpieces' | 'minutes' | 'drills'>('home');
+  const { user } = useAuth();
+  const playersRef = useRef<Player[]>([]);
 
   // --- Global Players State ---
   // We initialize from localStorage if available, otherwise use mocks.
@@ -37,6 +41,8 @@ export default function App() {
     return MOCK_PLAYERS;
   });
 
+  playersRef.current = players;
+
   // Handle Global Persistence for Player Updates
   // Note: LineupBuilder also writes to STORAGE_KEY, but it includes other data (drafts, formations).
   // When SetPieces is active, LineupBuilder is unmounted, so we must handle saving players here.
@@ -46,30 +52,76 @@ export default function App() {
   //
   // SAFEST APPROACH: Read-Modify-Write whenever players update.
   const handleUpdatePlayers = (newPlayers: Player[] | ((prev: Player[]) => Player[])) => {
-      setPlayers(prevPlayers => {
-          const resolvedPlayers = typeof newPlayers === 'function' ? newPlayers(prevPlayers) : newPlayers;
-          
-          // Persistence Logic
-          try {
-              const saved = localStorage.getItem(STORAGE_KEY);
-              const parsed = saved ? JSON.parse(saved) : {};
-              const newState = { ...parsed, players: resolvedPlayers };
-              localStorage.setItem(STORAGE_KEY, JSON.stringify(newState));
-          } catch (e) {
-              console.error("Failed to save players update", e);
-          }
+    setPlayers(prevPlayers => {
+      const resolvedPlayers = typeof newPlayers === 'function' ? newPlayers(prevPlayers) : newPlayers;
 
-          return resolvedPlayers;
-      });
+      // Local persistence
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        const parsed = saved ? JSON.parse(saved) : {};
+        const newState = { ...parsed, players: resolvedPlayers };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(newState));
+      } catch (e) {
+        console.error("Failed to save players update", e);
+      }
+
+      // Remote persistence (Supabase) for logged-in users
+      if (user?.id) {
+        savePlayersForUser(user.id, resolvedPlayers).catch(err => {
+          // eslint-disable-next-line no-console
+          console.error('[Supabase] Failed to sync players after update:', err);
+        });
+      }
+
+      return resolvedPlayers;
+    });
   };
 
+  // When a user logs in: load players from Supabase, or push local players to Supabase if remote is empty
   useEffect(() => {
-    // If sharing link, go straight to builder or setpieces
+    if (!user?.id) return;
+
+    let cancelled = false;
+    (async () => {
+      const remotePlayers = await fetchPlayersForUser(user.id);
+
+      if (cancelled) return;
+
+      if (remotePlayers.length > 0) {
+        setPlayers(remotePlayers);
+        try {
+          const saved = localStorage.getItem(STORAGE_KEY);
+          const parsed = saved ? JSON.parse(saved) : {};
+          localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...parsed, players: remotePlayers }));
+        } catch (e) {
+          console.error('Failed to cache remote players locally', e);
+        }
+        return;
+      }
+
+      // Remote is empty: push current local players so the table gets populated
+      const localPlayers = playersRef.current;
+      if (localPlayers.length > 0) {
+        savePlayersForUser(user.id, localPlayers).catch((err) => {
+          console.error('[Supabase] Initial sync failed:', err?.message ?? err);
+        });
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
+
+  useEffect(() => {
+    // If sharing link, go straight to the relevant tool
     const params = new URLSearchParams(window.location.search);
     if (params.get('data')) {
       setPage('builder');
     } else if (params.get('sp_data')) {
       setPage('setpieces');
+    } else if (params.get('ts_data')) {
+      setPage('drills');
     }
   }, []);
 
