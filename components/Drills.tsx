@@ -201,6 +201,7 @@ export const Drills: React.FC<DrillsProps> = ({ onNavigate, players: globalPlaye
     Array.isArray(saved?.savedDrills) ? saved.savedDrills : [],
   );
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
+  const [isClearPitchModalOpen, setIsClearPitchModalOpen] = useState(false);
   const [saveName, setSaveName] = useState('');
   const [drillView, setDrillView] = useState<'design' | 'bank' | 'sessions'>('design');
   const [trainingSessions, setTrainingSessions] = useState<TrainingSession[]>(
@@ -690,7 +691,10 @@ export const Drills: React.FC<DrillsProps> = ({ onNavigate, players: globalPlaye
   const handlePlacedPlayerRemove = (id: string) => { pushHistory(); setPlacedPlayers(prev => prev.filter(p => p.id !== id)); };
 
   const handleClearPitch = () => {
-    if (!window.confirm('Remove everything on the pitch? You can use Undo to restore.')) return;
+    setIsClearPitchModalOpen(true);
+  };
+
+  const confirmClearPitch = () => {
     pushHistory();
     setSlots([]);
     setCurrentAssignments({});
@@ -704,6 +708,8 @@ export const Drills: React.FC<DrillsProps> = ({ onNavigate, players: globalPlaye
     setPoles([]);
     setLadders([]);
     setPlacedPlayers([]);
+    setIsClearPitchModalOpen(false);
+    setSelectedElement(null);
   };
 
   const handleUpdatePlayerName = (playerId: string, newName: string) => {
@@ -974,6 +980,41 @@ export const Drills: React.FC<DrillsProps> = ({ onNavigate, players: globalPlaye
                   className="px-3 py-1.5 rounded-md text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:text-slate-500 text-white border border-emerald-500 shadow-lg disabled:cursor-not-allowed"
                 >
                   Save drill
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {isClearPitchModalOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+            <div className="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
+              <div className="p-6 text-center flex flex-col items-center gap-4">
+                <div className="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center">
+                  <Trash2 size={24} className="text-red-400" />
+                </div>
+                <h3 className="text-xl font-bold text-white">Clear Pitch?</h3>
+                <p className="text-slate-400 text-sm">
+                  This will remove all drills elements from the pitch. You can use Undo to restore.
+                </p>
+              </div>
+
+              <div className="p-4 bg-slate-800/50 border-t border-slate-700 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsClearPitchModalOpen(false)}
+                  className="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-bold rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    confirmClearPitch();
+                  }}
+                  className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-500 text-white text-sm font-bold rounded-lg transition-colors shadow-lg"
+                >
+                  Clear Pitch
                 </button>
               </div>
             </div>

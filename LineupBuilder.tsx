@@ -830,10 +830,15 @@ export const LineupBuilder: React.FC<LineupBuilderProps> = ({
             {/* Left Pane: Squad List */}
             <section className="flex-grow w-[48%] flex flex-col">
             <div className="bg-slate-800/50 p-2 rounded-t-lg border border-slate-700 border-b-0 flex justify-between items-center shrink-0">
-                <h2 className="text-sm font-bold text-slate-300 flex items-center gap-2">
-                    <Users size={16} />
-                    Selection Info
-                </h2>
+                <div className="flex flex-col gap-0.5">
+                    <h2 className="text-sm font-bold text-slate-300 flex items-center gap-2">
+                        <Users size={16} />
+                        Selection Info
+                    </h2>
+                    <p className="text-[10px] text-slate-500">
+                        Double‑click a name to rename a player; click the shirt number to edit it.
+                    </p>
+                </div>
                 <div className="flex items-center gap-2">
                     <span className="text-xs text-slate-500 font-semibold">Subs:</span>
                     <select 

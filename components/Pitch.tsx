@@ -364,6 +364,9 @@ export const Pitch: React.FC<PitchProps> = ({
     return { x, y, guideV, guideH };
   }
   function applyAlignment(rawX: number, rawY: number, excludeX?: number, excludeY?: number): { x: number; y: number } {
+    // In Set Pieces mode we don't want snap-to-alignment behavior.
+    // Keep positions 1:1 with the cursor for freeform coaching layouts.
+    if (isSmallMode) return { x: rawX, y: rawY };
     const { xs, ys } = getAlignmentTargets(excludeX, excludeY);
     const result = snapToAlignment(rawX, rawY, xs, ys);
     if (result.guideV !== undefined || result.guideH !== undefined) {
@@ -949,7 +952,7 @@ export const Pitch: React.FC<PitchProps> = ({
       onMouseLeave={handleMouseUp}
     >
       {/* --- ALIGNMENT GUIDES (Figma-style) --- */}
-      {alignmentGuides && !isExport && (
+      {alignmentGuides && !isExport && !isSmallMode && (
         <div className="absolute inset-0 pointer-events-none z-50">
           {alignmentGuides.vertical != null && (
             <div className="absolute top-0 bottom-0 w-0.5 bg-cyan-400/90 shadow-lg" style={{ left: `${alignmentGuides.vertical}%` }} />

@@ -201,6 +201,8 @@ export const SetPieces: React.FC<SetPiecesProps> = ({
   // Local UI State (not persisted)
   const [pitchSize, setPitchSize] = useState(500); // px width
   const [arrowToolActive, setArrowToolActive] = useState<false | 'solid' | 'dashed'>(false);
+  type PlacementElement = 'ball' | 'zone' | 'opponent';
+  const [placementElement, setPlacementElement] = useState<PlacementElement | null>(null);
   const [history, setHistory] = useState<SetPiecesSnapshot[]>([]);
   const [selectedArrowId, setSelectedArrowId] = useState<string | null>(null);
 
@@ -545,20 +547,27 @@ export const SetPieces: React.FC<SetPiecesProps> = ({
       setOpponents(prev => prev.filter(o => o.id !== id));
   };
 
-  const handleClearPitch = () => {
-      if (!window.confirm('Remove everything on the pitch? You can use Undo to restore.')) return;
+  const handleElementPlace = useCallback((x: number, y: number) => {
+    if (!placementElement) return;
+    if (placementElement === 'ball') {
       pushHistory();
-      setSlots([]);
-      setCurrentAssignments({});
-      setCurrentRoles({});
-      setBallPosition(null);
-      setArrows([]);
-      setZones([]);
-      setOpponents([]);
-      setNotes('');
-      setPlan('');
-      setLoadedRoutineId(null);
-      showToast('Pitch cleared');
+      setBallPosition({ x, y });
+      // Ball is unique, so turn off tool after placing
+      setPlacementElement(null);
+      return;
+    }
+    if (placementElement === 'zone') {
+      handleNewZoneDrop(x, y);
+      return;
+    }
+    if (placementElement === 'opponent') {
+      handleNewOpponentDrop(x, y);
+    }
+  }, [placementElement, pushHistory, handleNewZoneDrop, handleNewOpponentDrop]);
+
+  const handleClearPitch = () => {
+      // Open the styled confirmation modal (instead of window.confirm)
+      setIsClearBoardModalOpen(true);
   };
 
   const handleClearBoardClick = () => {
@@ -1258,14 +1267,14 @@ export const SetPieces: React.FC<SetPiecesProps> = ({
                             arrowDrawStyle={arrowToolActive === 'dashed' ? 'dashed' : 'solid'}
                             onArrowDragStart={pushHistory}
                             onArrowSelect={setSelectedArrowId}
-                            onPitchBackgroundClick={() => setSelectedArrowId(null)}
+                            elementPlacementMode={!!placementElement}
+                            onElementPlace={handleElementPlace}
+                            onPitchBackgroundClick={() => { setSelectedArrowId(null); setPlacementElement(null); }}
                             zones={zones}
-                            onNewZoneDrop={handleNewZoneDrop}
                             onZoneMove={handleZoneMove}
                             onZoneResize={handleZoneResize}
                             onZoneRemove={handleZoneRemove}
                             opponents={opponents}
-                            onNewOpponentDrop={handleNewOpponentDrop}
                             onOpponentMove={handleOpponentMove}
                             onOpponentRemove={handleOpponentRemove}
                             kitColor={kitColor.hex}
@@ -1345,14 +1354,22 @@ export const SetPieces: React.FC<SetPiecesProps> = ({
                             </h3>
                             <div className="flex gap-4 items-end justify-center flex-wrap">
                                 <div className="flex flex-col items-center gap-1">
-                                    <div
-                                        className="bg-slate-900 hover:bg-slate-700 text-slate-300 w-12 h-12 rounded-lg text-sm font-bold shadow-sm transition-all flex items-center justify-center border border-slate-600 cursor-grab active:cursor-grabbing hover:border-emerald-500/50 hover:text-white"
-                                        draggable
-                                        onDragStart={(e) => e.dataTransfer.setData('type', 'ball')}
-                                        title="Ball"
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                          setArrowToolActive(false);
+                                          setSelectedArrowId(null);
+                                          setPlacementElement(prev => prev === 'ball' ? null : 'ball');
+                                        }}
+                                        className={`w-12 h-12 rounded-lg text-sm font-bold shadow-sm transition-all flex items-center justify-center border ${
+                                          placementElement === 'ball'
+                                            ? 'bg-emerald-600/30 border-emerald-500 text-emerald-200 ring-2 ring-emerald-500/70'
+                                            : 'bg-slate-900 hover:bg-slate-700 text-slate-300 border-slate-600 hover:border-emerald-500/50 hover:text-white'
+                                        }`}
+                                        title={placementElement === 'ball' ? 'Ball — click pitch to place (click again to turn off)' : 'Ball — click then click pitch to place'}
                                     >
                                         <span className="text-2xl leading-none drop-shadow-md">⚽</span>
-                                    </div>
+                                    </button>
                                     <span className="text-[10px] text-slate-500">Ball</span>
                                 </div>
                                 <div className="flex flex-col items-center gap-1">
@@ -1360,8 +1377,6 @@ export const SetPieces: React.FC<SetPiecesProps> = ({
                                         type="button"
                                         onClick={() => setArrowToolActive(prev => prev === 'solid' ? false : 'solid')}
                                         className={`w-12 h-12 rounded-lg flex items-center justify-center border transition-all shrink-0 ${arrowToolActive === 'solid' ? 'bg-emerald-600/30 border-emerald-500 text-emerald-200 ring-2 ring-emerald-500/70' : 'bg-slate-900 hover:bg-slate-700 text-slate-300 border-slate-600 cursor-grab active:cursor-grabbing hover:border-emerald-500/50 hover:text-white'}`}
-                                        draggable
-                                        onDragStart={(e) => { e.dataTransfer.setData('type', 'arrow'); e.dataTransfer.setData('arrowStyle', 'solid'); }}
                                         title={arrowToolActive === 'solid' ? 'Run arrow — click again to turn off' : 'Arrow (run) — drag or draw'}
                                     >
                                         <MoveRight size={24} />
@@ -1373,8 +1388,6 @@ export const SetPieces: React.FC<SetPiecesProps> = ({
                                         type="button"
                                         onClick={() => setArrowToolActive(prev => prev === 'dashed' ? false : 'dashed')}
                                         className={`w-12 h-12 rounded-lg flex items-center justify-center border transition-all shrink-0 ${arrowToolActive === 'dashed' ? 'bg-emerald-600/30 border-emerald-500 text-emerald-200 ring-2 ring-emerald-500/70' : 'bg-slate-900 hover:bg-slate-700 text-slate-300 border-slate-600 cursor-grab active:cursor-grabbing hover:border-emerald-500/50 hover:text-white'}`}
-                                        draggable
-                                        onDragStart={(e) => { e.dataTransfer.setData('type', 'arrow'); e.dataTransfer.setData('arrowStyle', 'dashed'); }}
                                         title={arrowToolActive === 'dashed' ? 'Pass — click again to turn off' : 'Pass (dotted) — drag or draw'}
                                     >
                                         <Send size={22} />
@@ -1382,25 +1395,41 @@ export const SetPieces: React.FC<SetPiecesProps> = ({
                                     <span className="text-[10px] text-slate-500">Pass</span>
                                 </div>
                                 <div className="flex flex-col items-center gap-1">
-                                    <div
-                                        className="bg-slate-900 hover:bg-slate-700 text-slate-300 w-12 h-12 rounded-lg text-sm font-bold shadow-sm transition-all flex items-center justify-center border border-slate-600 cursor-grab active:cursor-grabbing hover:border-emerald-500/50 hover:text-white"
-                                        draggable
-                                        onDragStart={(e) => e.dataTransfer.setData('type', 'zone')}
-                                        title="Target Zone"
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                          setArrowToolActive(false);
+                                          setSelectedArrowId(null);
+                                          setPlacementElement(prev => prev === 'zone' ? null : 'zone');
+                                        }}
+                                        className={`w-12 h-12 rounded-lg text-sm font-bold shadow-sm transition-all flex items-center justify-center border ${
+                                          placementElement === 'zone'
+                                            ? 'bg-emerald-600/30 border-emerald-500 text-emerald-200 ring-2 ring-emerald-500/70'
+                                            : 'bg-slate-900 hover:bg-slate-700 text-slate-300 border-slate-600 hover:border-emerald-500/50 hover:text-white'
+                                        }`}
+                                        title={placementElement === 'zone' ? 'Target zone — click pitch to place (click again to turn off)' : 'Target zone — click then click pitch to place'}
                                     >
                                         <CircleDashed size={24} className="text-yellow-400" />
-                                    </div>
+                                    </button>
                                     <span className="text-[10px] text-slate-500">Zone</span>
                                 </div>
                                 <div className="flex flex-col items-center gap-1">
-                                    <div
-                                        className="bg-slate-900 hover:bg-slate-700 text-slate-300 w-12 h-12 rounded-lg text-sm font-bold shadow-sm transition-all flex items-center justify-center border border-slate-600 cursor-grab active:cursor-grabbing hover:border-emerald-500/50 hover:text-white"
-                                        draggable
-                                        onDragStart={(e) => e.dataTransfer.setData('type', 'opponent')}
-                                        title="Opposition Player"
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                          setArrowToolActive(false);
+                                          setSelectedArrowId(null);
+                                          setPlacementElement(prev => prev === 'opponent' ? null : 'opponent');
+                                        }}
+                                        className={`w-12 h-12 rounded-lg text-sm font-bold shadow-sm transition-all flex items-center justify-center border ${
+                                          placementElement === 'opponent'
+                                            ? 'bg-emerald-600/30 border-emerald-500 text-emerald-200 ring-2 ring-emerald-500/70'
+                                            : 'bg-slate-900 hover:bg-slate-700 text-slate-300 border-slate-600 hover:border-emerald-500/50 hover:text-white'
+                                        }`}
+                                        title={placementElement === 'opponent' ? 'Opponent — click pitch to place (click again to turn off)' : 'Opponent — click then click pitch to place'}
                                     >
                                         <User size={24} className="text-slate-400" />
-                                    </div>
+                                    </button>
                                     <span className="text-[10px] text-slate-500">Opponent</span>
                                 </div>
                             </div>
