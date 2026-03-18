@@ -10,6 +10,15 @@ interface NavMenuProps {
 export const NavMenu: React.FC<NavMenuProps> = ({ onNavigate, currentPage }) => {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const [sportMenuOpen, setSportMenuOpen] = useState(false);
+  const [sport, setSport] = useState<'football' | 'handball'>(() => {
+    try {
+      const raw = localStorage.getItem('taptics_sport_v1');
+      return raw === 'handball' ? 'handball' : 'football';
+    } catch {
+      return 'football';
+    }
+  });
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -25,6 +34,7 @@ export const NavMenu: React.FC<NavMenuProps> = ({ onNavigate, currentPage }) => 
   const handleNav = (page: 'home' | 'builder' | 'setpieces' | 'articles' | 'minutes' | 'drills') => {
     onNavigate(page);
     setIsOpen(false);
+    setSportMenuOpen(false);
   };
 
   const itemClass = (page: string) => 
@@ -67,6 +77,68 @@ export const NavMenu: React.FC<NavMenuProps> = ({ onNavigate, currentPage }) => 
               <Clock size={16} />
               Minutes Log
             </button>
+
+            <div className="h-px bg-slate-700/60 my-2" />
+
+            <button
+              type="button"
+              onClick={() => setSportMenuOpen((v) => !v)}
+              className={`flex items-center gap-3 px-4 py-3 text-sm font-bold transition-colors w-full text-left border-l-2 border-transparent ${
+                sportMenuOpen ? 'bg-emerald-600/10 text-emerald-400' : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+              }`}
+              aria-label="Change sport"
+            >
+              <Target size={16} />
+              Change Sport
+            </button>
+
+            {sportMenuOpen && (
+              <div className="px-1 pb-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSport('football');
+                    try {
+                      localStorage.setItem('taptics_sport_v1', 'football');
+                    } catch {
+                      // ignore
+                    }
+                    setSportMenuOpen(false);
+                    setIsOpen(false);
+                  }}
+                  className={`flex items-center gap-3 px-4 py-3 text-sm font-bold transition-colors w-full text-left border-l-2 ${
+                    sport === 'football'
+                      ? 'bg-emerald-600/10 text-emerald-400 border-emerald-500'
+                      : 'text-slate-300 hover:bg-slate-800 hover:text-white border-transparent'
+                  }`}
+                >
+                  <span className="w-2 h-2 rounded-full bg-emerald-400" aria-hidden="true" />
+                  Football
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSport('handball');
+                    try {
+                      localStorage.setItem('taptics_sport_v1', 'handball');
+                    } catch {
+                      // ignore
+                    }
+                    setSportMenuOpen(false);
+                    setIsOpen(false);
+                  }}
+                  className={`flex items-center gap-3 px-4 py-3 text-sm font-bold transition-colors w-full text-left border-l-2 ${
+                    sport === 'handball'
+                      ? 'bg-emerald-600/10 text-emerald-400 border-emerald-500'
+                      : 'text-slate-300 hover:bg-slate-800 hover:text-white border-transparent'
+                  }`}
+                >
+                  <span className="w-2 h-2 rounded-full bg-blue-400" aria-hidden="true" />
+                  Handball
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
