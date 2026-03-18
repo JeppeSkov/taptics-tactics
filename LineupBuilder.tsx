@@ -5,6 +5,7 @@ import { Pitch } from './components/Pitch';
 import { Substitutes } from './components/Substitutes';
 import { SharedView } from './components/SharedView';
 import { NavMenu } from './components/NavMenu';
+import { ScheduleCalendar } from './components/ScheduleCalendar';
 import { Player, TacticalSlot } from './types';
 import { MOCK_PLAYERS, FORMATIONS_11, FORMATIONS_8, FORMATIONS_7, BENCH_SLOTS, STORAGE_KEY } from './constants';
 import { LayoutGrid, Users, MessageSquare, Calendar, Edit2, Check, X, Plus, Palette, Layers, ClipboardList, Link as LinkIcon, Eye, Shield, Swords, RotateCcw, ChevronLeft, ChevronDown, AlertTriangle, Share2, Copy } from 'lucide-react';
@@ -501,6 +502,16 @@ export const LineupBuilder: React.FC<LineupBuilderProps> = ({
 
   const handleUpdatePlayerName = (playerId: string, newName: string) => {
     setPlayers(prev => prev.map(p => p.id === playerId ? { ...p, name: newName } : p));
+    // Keep player names in sync across Draft 1/2/3 for the same player id.
+    // (Drafts store their own player snapshots, so we must update all of them.)
+    setDrafts(prevDrafts =>
+      prevDrafts.map((d) => ({
+        ...d,
+        players: d.players.map((p) =>
+          p.id === playerId ? { ...p, name: newName } : p
+        ),
+      }))
+    );
   };
 
   const handleUpdatePlayerNumber = (playerId: string, newNumber: number) => {
@@ -823,6 +834,8 @@ export const LineupBuilder: React.FC<LineupBuilderProps> = ({
                 </div>
             </div>
           </header>
+
+          <ScheduleCalendar />
 
           {/* Main Content Area */}
           <div className="flex flex-1 gap-4 overflow-hidden min-h-0">

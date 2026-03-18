@@ -23,6 +23,59 @@ export default function App() {
   const { user } = useAuth();
   const playersRef = useRef<Player[]>([]);
 
+  const MOBILE_NOTICE_DISMISSED_KEY = 'mobile_only_notice_dismissed_v1';
+  const [mobileNoticeDismissed, setMobileNoticeDismissed] = useState(false);
+  const [showMobileOnlyNotice, setShowMobileOnlyNotice] = useState(false);
+  const dismissMobileNoticeButtonRef = useRef<HTMLButtonElement | null>(null);
+
+  const getIsMobileDevice = () => {
+    // Width-based detection handles "tablet in browser" better than UA sniffing.
+    // UA fallback covers cases where width reports desktop layout.
+    const width = window.innerWidth;
+    const ua = navigator.userAgent || '';
+    const isSmallViewport = width < 768;
+    const isMobileUa = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+    return isSmallViewport || isMobileUa;
+  };
+
+  const dismissMobileNotice = () => {
+    setShowMobileOnlyNotice(false);
+    setMobileNoticeDismissed(true);
+    try {
+      localStorage.setItem(MOBILE_NOTICE_DISMISSED_KEY, 'true');
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to persist mobile notice dismissal', e);
+    }
+  };
+
+  // Mobile-only notice (shown once per device/browser).
+  useEffect(() => {
+    try {
+      setMobileNoticeDismissed(localStorage.getItem(MOBILE_NOTICE_DISMISSED_KEY) === 'true');
+    } catch {
+      setMobileNoticeDismissed(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (mobileNoticeDismissed) return;
+
+    const checkMobile = () => {
+      setShowMobileOnlyNotice(getIsMobileDevice());
+    };
+
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mobileNoticeDismissed]);
+
+  useEffect(() => {
+    if (!showMobileOnlyNotice) return;
+    dismissMobileNoticeButtonRef.current?.focus();
+  }, [showMobileOnlyNotice]);
+
   // --- Global Players State ---
   // We initialize from localStorage if available, otherwise use mocks.
   const [players, setPlayers] = useState<Player[]>(() => {
@@ -137,6 +190,48 @@ export default function App() {
 
   return (
     <>
+      {showMobileOnlyNotice && (
+        <div
+          className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+          role="presentation"
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="mobile-only-notice-title"
+            className="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl w-full max-w-md overflow-hidden"
+            tabIndex={-1}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') dismissMobileNotice();
+            }}
+          >
+            <div className="p-6 text-center flex flex-col items-center gap-4">
+              <div
+                className="w-12 h-12 rounded-full bg-amber-500/20 flex items-center justify-center"
+                aria-hidden="true"
+              >
+                <span className="text-amber-400 text-2xl font-bold">!</span>
+              </div>
+              <h2 id="mobile-only-notice-title" className="text-xl font-bold text-white">
+                This app only works on a computer
+              </h2>
+              <p className="text-slate-400 text-sm">
+                The lineup/tactics editor is designed for desktop. On mobile, drag-and-drop and saving may not work correctly.
+              </p>
+            </div>
+
+            <div className="p-4 bg-slate-800/50 border-t border-slate-700 flex justify-center">
+              <button
+                ref={dismissMobileNoticeButtonRef}
+                onClick={dismissMobileNotice}
+                className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold rounded-lg transition-colors shadow-lg"
+              >
+                I understand
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {page === 'home' && (
         <Home 
             onStart={() => setPage('builder')} 

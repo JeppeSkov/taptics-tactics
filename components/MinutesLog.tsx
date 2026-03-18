@@ -353,7 +353,7 @@ export const MinutesLog: React.FC<MinutesLogProps> = ({ onNavigate, players }) =
                 </div>
                 
                 <div className="flex items-center gap-2">
-                    {/* New Season Button */}
+                    {/* New Log Button */}
                     <div className="relative">
                         {isCreatingSeason ? (
                             <div className="flex items-center gap-1 bg-slate-800 p-1 rounded border border-slate-600 animate-in fade-in slide-in-from-right-4">
@@ -374,7 +374,7 @@ export const MinutesLog: React.FC<MinutesLogProps> = ({ onNavigate, players }) =
                                 className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-2 rounded text-xs font-bold transition-colors flex items-center gap-2 border border-slate-700"
                             >
                                 <FolderPlus size={14} />
-                                New Season
+                                New Log
                             </button>
                         )}
                     </div>
