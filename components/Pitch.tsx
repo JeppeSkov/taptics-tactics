@@ -212,6 +212,7 @@ interface PitchProps {
   viewMode?: 'full' | 'offensive' | 'defensive' | 'penalty';
   playerIconStyle?: 'shirt' | 'circle';
   isSmallMode?: boolean; 
+  sport?: 'football' | 'handball';
 }
 
 export const Pitch: React.FC<PitchProps> = ({ 
@@ -287,10 +288,43 @@ export const Pitch: React.FC<PitchProps> = ({
   isExport = false,
   viewMode = 'full',
   playerIconStyle = 'shirt',
-  isSmallMode = false
+  isSmallMode = false,
+  sport: sportProp
 }) => {
   const getPlayerInSlot = (slotId: string) => players.find(p => p.assignedSlot === slotId);
   const scaleVal = (s: number | undefined | null): number => (typeof s === 'number' && Number.isFinite(s) && s > 0 ? s : 1);
+
+  const SPORT_STORAGE_KEY = 'taptics_sport_v1';
+  const getSportFromStorage = (): 'football' | 'handball' => {
+    try {
+      const raw = localStorage.getItem(SPORT_STORAGE_KEY);
+      return raw === 'handball' ? 'handball' : 'football';
+    } catch {
+      return 'football';
+    }
+  };
+
+  const [sport, setSport] = useState<'football' | 'handball'>(
+    sportProp ?? getSportFromStorage(),
+  );
+
+  useEffect(() => {
+    if (sportProp) {
+      setSport(sportProp);
+      return;
+    }
+
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { sport?: 'football' | 'handball' } | undefined;
+      if (detail?.sport) setSport(detail.sport);
+      else setSport(getSportFromStorage());
+    };
+
+    setSport(getSportFromStorage());
+    window.addEventListener('taptics:sport-change', handler as EventListener);
+    return () => window.removeEventListener('taptics:sport-change', handler as EventListener);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sportProp]);
 
   // -- Drag Logic for Arrows --
   const [dragState, setDragState] = useState<{
@@ -939,11 +973,13 @@ export const Pitch: React.FC<PitchProps> = ({
   const markerSizeBase = isSmallMode ? 3.2 : 4;
   const markerRefXBase = isSmallMode ? 2.5 : 3;
   const markerViewBox = "0 0 4 4";
+
+  const pitchBgClass = sport === 'handball' ? 'bg-indigo-900' : 'bg-green-700';
   
   return (
     <div 
       ref={containerRef}
-      className={`relative w-full ${aspectRatioClass} bg-green-700 rounded-lg overflow-hidden border-2 border-slate-600 shadow-2xl pitch-pattern transition-all duration-300 select-none ${(arrowDrawingMode || placedPlayerDrawingMode || elementPlacementMode) ? 'cursor-crosshair' : ''}`}
+      className={`relative w-full ${aspectRatioClass} ${pitchBgClass} rounded-lg overflow-hidden border-2 border-slate-600 shadow-2xl pitch-pattern transition-all duration-300 select-none ${(arrowDrawingMode || placedPlayerDrawingMode || elementPlacementMode) ? 'cursor-crosshair' : ''}`}
       onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }}
       onDrop={handlePitchDrop}
       onMouseDown={handlePitchClick}
@@ -966,46 +1002,101 @@ export const Pitch: React.FC<PitchProps> = ({
       {/* --- PITCH MARKINGS --- */}
       
       {viewMode === 'full' && (
-        <>
-          <div className="absolute top-0 bottom-0 left-0 right-0 border-2 border-white/20 m-4 rounded-sm pointer-events-none"></div>
-          <div className="absolute top-[50%] left-0 right-0 h-[1px] bg-white/20 pointer-events-none"></div>
-          <div className="absolute top-[50%] left-[50%] w-24 h-24 border border-white/20 rounded-full transform -translate-x-1/2 -translate-y-1/2 pointer-events-none"></div>
-          <div className="absolute top-4 left-[25%] right-[25%] h-16 border border-white/20 border-t-0 pointer-events-none"></div>
-          <div className="absolute bottom-4 left-[25%] right-[25%] h-16 border border-white/20 border-b-0 pointer-events-none"></div>
-        </>
+        sport === 'handball' ? (
+          <>
+            <div className="absolute top-0 bottom-0 left-0 right-0 border-2 border-white/20 m-4 rounded-sm pointer-events-none"></div>
+            <div className="absolute top-[50%] left-0 right-0 h-[1px] bg-white/20 pointer-events-none"></div>
+            <div className="absolute top-[50%] left-[50%] w-20 h-20 border border-white/20 rounded-full transform -translate-x-1/2 -translate-y-1/2 pointer-events-none"></div>
+
+            {/* Goal areas (approx) */}
+            <div className="absolute top-0 left-[22.5%] right-[22.5%] h-[15%] border border-white/20 border-t-0 pointer-events-none"></div>
+            <div className="absolute bottom-0 left-[22.5%] right-[22.5%] h-[15%] border border-white/20 border-b-0 pointer-events-none"></div>
+
+            {/* 7m lines (approx) */}
+            <div className="absolute top-[17.5%] left-0 right-0 h-[1px] bg-white/20 pointer-events-none"></div>
+            <div className="absolute bottom-[17.5%] left-0 right-0 h-[1px] bg-white/20 pointer-events-none"></div>
+          </>
+        ) : (
+          <>
+            <div className="absolute top-0 bottom-0 left-0 right-0 border-2 border-white/20 m-4 rounded-sm pointer-events-none"></div>
+            <div className="absolute top-[50%] left-0 right-0 h-[1px] bg-white/20 pointer-events-none"></div>
+            <div className="absolute top-[50%] left-[50%] w-24 h-24 border border-white/20 rounded-full transform -translate-x-1/2 -translate-y-1/2 pointer-events-none"></div>
+            <div className="absolute top-4 left-[25%] right-[25%] h-16 border border-white/20 border-t-0 pointer-events-none"></div>
+            <div className="absolute bottom-4 left-[25%] right-[25%] h-16 border border-white/20 border-b-0 pointer-events-none"></div>
+          </>
+        )
       )}
 
       {viewMode === 'offensive' && (
-        <>
-           <div className="absolute top-0 bottom-0 left-0 right-0 border-2 border-white/20 m-4 rounded-sm border-b-0 pointer-events-none"></div>
-           <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-white/20 m-4 mb-0 pointer-events-none"></div>
-           <div className="absolute top-4 left-[25%] right-[25%] h-[20%] border border-white/20 border-t-0 pointer-events-none"></div>
-           <div className="absolute top-4 left-[40%] right-[40%] h-[8%] border border-white/20 border-t-0 pointer-events-none"></div>
-           <div className="absolute bottom-0 left-[50%] w-32 h-32 border border-white/20 rounded-full transform -translate-x-1/2 translate-y-1/2 pointer-events-none"></div>
-           <div className="absolute top-4 left-4 w-8 h-8 border-b border-r border-white/20 rounded-br-full pointer-events-none"></div>
-           <div className="absolute top-4 right-4 w-8 h-8 border-b border-l border-white/20 rounded-bl-full pointer-events-none"></div>
-        </>
+        sport === 'handball' ? (
+          <>
+            <div className="absolute top-0 bottom-0 left-0 right-0 border-2 border-white/20 m-4 rounded-sm border-b-0 pointer-events-none"></div>
+            <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-white/20 m-4 mb-0 pointer-events-none"></div>
+
+            <div className="absolute top-0 left-[22.5%] right-[22.5%] h-[15%] border border-white/20 border-t-0 pointer-events-none"></div>
+            <div className="absolute top-[17.5%] left-0 right-0 h-[1px] bg-white/20 pointer-events-none"></div>
+
+            {/* Keep center circle-ish marker */}
+            <div className="absolute bottom-0 left-[50%] w-32 h-32 border border-white/20 rounded-full transform -translate-x-1/2 translate-y-1/2 pointer-events-none"></div>
+            <div className="absolute top-4 left-4 w-8 h-8 border-b border-r border-white/20 rounded-br-full pointer-events-none"></div>
+            <div className="absolute top-4 right-4 w-8 h-8 border-b border-l border-white/20 rounded-bl-full pointer-events-none"></div>
+          </>
+        ) : (
+          <>
+             <div className="absolute top-0 bottom-0 left-0 right-0 border-2 border-white/20 m-4 rounded-sm border-b-0 pointer-events-none"></div>
+             <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-white/20 m-4 mb-0 pointer-events-none"></div>
+             <div className="absolute top-4 left-[25%] right-[25%] h-[20%] border border-white/20 border-t-0 pointer-events-none"></div>
+             <div className="absolute top-4 left-[40%] right-[40%] h-[8%] border border-white/20 border-t-0 pointer-events-none"></div>
+             <div className="absolute bottom-0 left-[50%] w-32 h-32 border border-white/20 rounded-full transform -translate-x-1/2 translate-y-1/2 pointer-events-none"></div>
+             <div className="absolute top-4 left-4 w-8 h-8 border-b border-r border-white/20 rounded-br-full pointer-events-none"></div>
+             <div className="absolute top-4 right-4 w-8 h-8 border-b border-l border-white/20 rounded-bl-full pointer-events-none"></div>
+          </>
+        )
       )}
 
       {viewMode === 'defensive' && (
-        <>
-           <div className="absolute top-0 bottom-0 left-0 right-0 border-2 border-white/20 m-4 rounded-sm border-t-0 pointer-events-none"></div>
-           <div className="absolute top-0 left-0 right-0 h-[2px] bg-white/20 m-4 mt-0 pointer-events-none"></div>
-           <div className="absolute bottom-4 left-[25%] right-[25%] h-[20%] border border-white/20 border-b-0 pointer-events-none"></div>
-           <div className="absolute bottom-4 left-[40%] right-[40%] h-[8%] border border-white/20 border-b-0 pointer-events-none"></div>
-           <div className="absolute top-0 left-[50%] w-32 h-32 border border-white/20 rounded-full transform -translate-x-1/2 -translate-y-1/2 pointer-events-none"></div>
-           <div className="absolute bottom-4 left-4 w-8 h-8 border-t border-r border-white/20 rounded-tr-full pointer-events-none"></div>
-           <div className="absolute bottom-4 right-4 w-8 h-8 border-t border-l border-white/20 rounded-tl-full pointer-events-none"></div>
-        </>
+        sport === 'handball' ? (
+          <>
+            <div className="absolute top-0 bottom-0 left-0 right-0 border-2 border-white/20 m-4 rounded-sm border-t-0 pointer-events-none"></div>
+            <div className="absolute top-0 left-0 right-0 h-[2px] bg-white/20 m-4 mt-0 pointer-events-none"></div>
+
+            <div className="absolute bottom-0 left-[22.5%] right-[22.5%] h-[15%] border border-white/20 border-b-0 pointer-events-none"></div>
+            <div className="absolute bottom-[17.5%] left-0 right-0 h-[1px] bg-white/20 pointer-events-none"></div>
+
+            <div className="absolute top-0 left-[50%] w-32 h-32 border border-white/20 rounded-full transform -translate-x-1/2 -translate-y-1/2 pointer-events-none"></div>
+            <div className="absolute bottom-4 left-4 w-8 h-8 border-t border-r border-white/20 rounded-tr-full pointer-events-none"></div>
+            <div className="absolute bottom-4 right-4 w-8 h-8 border-t border-l border-white/20 rounded-tl-full pointer-events-none"></div>
+          </>
+        ) : (
+          <>
+             <div className="absolute top-0 bottom-0 left-0 right-0 border-2 border-white/20 m-4 rounded-sm border-t-0 pointer-events-none"></div>
+             <div className="absolute top-0 left-0 right-0 h-[2px] bg-white/20 m-4 mt-0 pointer-events-none"></div>
+             <div className="absolute bottom-4 left-[25%] right-[25%] h-[20%] border border-white/20 border-b-0 pointer-events-none"></div>
+             <div className="absolute bottom-4 left-[40%] right-[40%] h-[8%] border border-white/20 border-b-0 pointer-events-none"></div>
+             <div className="absolute top-0 left-[50%] w-32 h-32 border border-white/20 rounded-full transform -translate-x-1/2 -translate-y-1/2 pointer-events-none"></div>
+             <div className="absolute bottom-4 left-4 w-8 h-8 border-t border-r border-white/20 rounded-tr-full pointer-events-none"></div>
+             <div className="absolute bottom-4 right-4 w-8 h-8 border-t border-l border-white/20 rounded-tl-full pointer-events-none"></div>
+          </>
+        )
       )}
 
       {viewMode === 'penalty' && (
-        <>
-           <div className="absolute inset-0 border-2 border-white/20 m-2 rounded-sm pointer-events-none"></div>
-           <div className="absolute top-0 left-0 right-0 h-[2px] bg-white/20 m-2 mt-0 pointer-events-none"></div>
-           <div className="absolute top-2 left-[15%] right-[15%] h-[25%] border border-white/20 border-t-0 pointer-events-none"></div>
-           <div className="absolute top-2 left-[35%] right-[35%] h-[12%] border border-white/20 border-t-0 pointer-events-none"></div>
-        </>
+        sport === 'handball' ? (
+          <>
+            <div className="absolute inset-0 border-2 border-white/20 m-2 rounded-sm pointer-events-none"></div>
+            <div className="absolute top-0 left-0 right-0 h-[2px] bg-white/20 m-2 mt-0 pointer-events-none"></div>
+            {/* Approximate goal area for handball penalty scenario */}
+            <div className="absolute top-2 left-[20%] right-[20%] h-[30%] border border-white/20 border-t-0 pointer-events-none"></div>
+            <div className="absolute top-2 left-[40%] right-[40%] h-[15%] border border-white/20 border-t-0 pointer-events-none"></div>
+          </>
+        ) : (
+          <>
+            <div className="absolute inset-0 border-2 border-white/20 m-2 rounded-sm pointer-events-none"></div>
+            <div className="absolute top-0 left-0 right-0 h-[2px] bg-white/20 m-2 mt-0 pointer-events-none"></div>
+            <div className="absolute top-2 left-[15%] right-[15%] h-[25%] border border-white/20 border-t-0 pointer-events-none"></div>
+            <div className="absolute top-2 left-[35%] right-[35%] h-[12%] border border-white/20 border-t-0 pointer-events-none"></div>
+          </>
+        )
       )}
 
       {/* --- ZONES LAYER --- */}

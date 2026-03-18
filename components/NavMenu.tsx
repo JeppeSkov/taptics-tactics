@@ -103,6 +103,13 @@ export const NavMenu: React.FC<NavMenuProps> = ({ onNavigate, currentPage }) => 
                     } catch {
                       // ignore
                     }
+                    try {
+                      window.dispatchEvent(
+                        new CustomEvent('taptics:sport-change', { detail: { sport: 'football' } }),
+                      );
+                    } catch {
+                      // ignore
+                    }
                     setSportMenuOpen(false);
                     setIsOpen(false);
                   }}
@@ -122,6 +129,13 @@ export const NavMenu: React.FC<NavMenuProps> = ({ onNavigate, currentPage }) => 
                     setSport('handball');
                     try {
                       localStorage.setItem('taptics_sport_v1', 'handball');
+                    } catch {
+                      // ignore
+                    }
+                    try {
+                      window.dispatchEvent(
+                        new CustomEvent('taptics:sport-change', { detail: { sport: 'handball' } }),
+                      );
                     } catch {
                       // ignore
                     }
