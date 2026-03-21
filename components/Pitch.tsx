@@ -947,7 +947,8 @@ export const Pitch: React.FC<PitchProps> = ({
   };
 
   // Dynamic scaling based on export mode
-  const shirtSize = isExport ? 64 : 48;
+  // Standard lineup shirts are ~20% smaller (48 -> 38).
+  const shirtSize = isExport ? 64 : 38;
   
   // Adjusted container size logic
   // If isSmallMode (Set Pieces), we allow the container to shrink to fit the content exactly.
@@ -963,8 +964,8 @@ export const Pitch: React.FC<PitchProps> = ({
   // w-6 h-6 is 1.5rem (24px). w-7 h-7 is 1.75rem (28px). w-9 h-9 is 2.25rem (36px).
   // 24px is roughly 14% smaller than 28px, fulfilling the 10% smaller request.
   const circleSizeClass = isSmallMode ? 'w-6 h-6 text-[10px]' : 'w-9 h-9 text-sm';
-  const nameTextSize = isExport ? 'text-base font-bold' : (isSmallMode ? 'text-[10px] font-bold' : 'text-xs font-bold');
-  const namePadding = isExport ? 'px-3 py-1' : (isSmallMode ? 'px-1.5 py-0' : 'px-2 py-0.5');
+  const nameTextSize = isExport ? 'text-base font-bold' : (isSmallMode ? 'text-[10px] font-bold' : 'text-[10px] font-bold');
+  const namePadding = isExport ? 'px-3 py-1' : (isSmallMode ? 'px-1.5 py-0' : 'px-1.5 py-0');
   
   const aspectRatioClass = viewMode === 'full' ? 'aspect-[5/6]' : viewMode === 'penalty' ? 'aspect-[3/2]' : 'aspect-[5/3]';
 
