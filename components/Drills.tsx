@@ -45,7 +45,7 @@ const safeAtob = (str: string) => {
 type DrillViewMode = 'full' | 'offensive' | 'defensive' | 'penalty';
 
 interface DrillsProps {
-  onNavigate: (page: 'home' | 'builder' | 'setpieces' | 'articles' | 'minutes' | 'drills') => void;
+  onNavigate: (page: 'home' | 'builder' | 'setpieces' | 'articles' | 'minutes' | 'drills' | 'faq') => void;
   players: Player[];
   setPlayers: (newPlayers: Player[] | ((prev: Player[]) => Player[])) => void;
 }

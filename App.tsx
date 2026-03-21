@@ -6,6 +6,7 @@ import { Articles } from './components/Articles';
 import { SetPieces } from './components/SetPieces';
 import { Drills } from './components/Drills';
 import { MinutesLog } from './components/MinutesLog';
+import { FAQ } from './components/FAQ';
 import { Player } from './types';
 import { MOCK_PLAYERS, STORAGE_KEY } from './constants';
 import { useAuth } from './supabaseAuth';
@@ -18,10 +19,20 @@ declare global {
   }
 }
 
+type AppPage = 'home' | 'builder' | 'articles' | 'setpieces' | 'minutes' | 'drills' | 'faq';
+
 export default function App() {
-  const [page, setPage] = useState<'home' | 'builder' | 'articles' | 'setpieces' | 'minutes' | 'drills'>('home');
+  const [page, setPage] = useState<AppPage>('home');
   const { user } = useAuth();
   const playersRef = useRef<Player[]>([]);
+  /** Remember last screen before FAQ so the FAQ back arrow returns there (not always home). */
+  const lastNonFaqPageRef = useRef<Exclude<AppPage, 'faq'>>('home');
+
+  useEffect(() => {
+    if (page !== 'faq') {
+      lastNonFaqPageRef.current = page;
+    }
+  }, [page]);
 
   const MOBILE_NOTICE_DISMISSED_KEY = 'mobile_only_notice_dismissed_v1';
   const [mobileNoticeDismissed, setMobileNoticeDismissed] = useState(false);
@@ -249,6 +260,12 @@ export default function App() {
         <Articles 
             onBack={() => setPage('home')} 
             onNavigate={(p) => setPage(p)}
+        />
+      )}
+      {page === 'faq' && (
+        <FAQ
+          onBack={() => setPage(lastNonFaqPageRef.current)}
+          onNavigate={(p) => setPage(p)}
         />
       )}
       {page === 'setpieces' && (

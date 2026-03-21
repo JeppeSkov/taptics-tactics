@@ -5,7 +5,7 @@ import { useAuth } from '../supabaseAuth';
 
 interface HomeProps {
   onStart: () => void;
-  onNavigate: (page: 'home' | 'builder' | 'articles' | 'setpieces' | 'minutes' | 'drills') => void;
+  onNavigate: (page: 'home' | 'builder' | 'articles' | 'setpieces' | 'minutes' | 'drills' | 'faq') => void;
 }
 
 export const Home: React.FC<HomeProps> = ({ onStart, onNavigate }) => {
@@ -58,6 +58,16 @@ export const Home: React.FC<HomeProps> = ({ onStart, onNavigate }) => {
              className="hover:text-emerald-400 transition-colors"
            >
              Articles
+           </a>
+           <a
+             href="#faq"
+             onClick={(e) => {
+               e.preventDefault();
+               onNavigate('faq');
+             }}
+             className="hover:text-emerald-400 transition-colors"
+           >
+             FAQ
            </a>
         </nav>
         <div className="flex items-center gap-3 relative">
@@ -281,11 +291,20 @@ export const Home: React.FC<HomeProps> = ({ onStart, onNavigate }) => {
         </div>
       </main>
 
-      <footer className="w-full border-t border-slate-900 py-10 text-center">
+      <footer className="w-full border-t border-slate-900 py-10 text-center px-4">
          <div className="flex items-center justify-center gap-2 mb-4 opacity-50">
             <LayoutGrid size={20} />
             <span className="font-bold tracking-tight">Taptics</span>
          </div>
+         <nav className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-sm text-slate-500 mb-4" aria-label="Footer">
+            <button type="button" onClick={() => onNavigate('articles')} className="hover:text-emerald-400 transition-colors">
+              Articles
+            </button>
+            <span className="text-slate-700" aria-hidden>|</span>
+            <button type="button" onClick={() => onNavigate('faq')} className="hover:text-emerald-400 transition-colors">
+              Football lineup builder FAQ
+            </button>
+         </nav>
          <p className="text-slate-600 text-sm">&copy; {new Date().getFullYear()} Taptics. Inspired by the beautiful game.</p>
       </footer>
     </div>

@@ -6,7 +6,7 @@ import { MINUTES_STORAGE_KEY } from '../constants';
 import { Clock, Plus, Trash2, Calendar, Check, X, ArrowLeft, ChevronDown, ChevronRight, FolderPlus, Layers, AlertTriangle } from 'lucide-react';
 
 interface MinutesLogProps {
-  onNavigate: (page: 'home' | 'builder' | 'setpieces' | 'articles' | 'minutes' | 'drills') => void;
+  onNavigate: (page: 'home' | 'builder' | 'setpieces' | 'articles' | 'minutes' | 'drills' | 'faq') => void;
   players: Player[];
 }
 

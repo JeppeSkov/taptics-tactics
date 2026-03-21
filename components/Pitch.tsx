@@ -294,19 +294,9 @@ export const Pitch: React.FC<PitchProps> = ({
   const getPlayerInSlot = (slotId: string) => players.find(p => p.assignedSlot === slotId);
   const scaleVal = (s: number | undefined | null): number => (typeof s === 'number' && Number.isFinite(s) && s > 0 ? s : 1);
 
-  const SPORT_STORAGE_KEY = 'taptics_sport_v1';
-  const getSportFromStorage = (): 'football' | 'handball' => {
-    try {
-      const raw = localStorage.getItem(SPORT_STORAGE_KEY);
-      return raw === 'handball' ? 'handball' : 'football';
-    } catch {
-      return 'football';
-    }
-  };
-
-  const [sport, setSport] = useState<'football' | 'handball'>(
-    sportProp ?? getSportFromStorage(),
-  );
+  // Default to football. We no longer read `taptics_sport_v1` from localStorage (that was
+  // set by the removed "Change Sport" menu and caused a stale handball pitch for many users).
+  const [sport, setSport] = useState<'football' | 'handball'>(sportProp ?? 'football');
 
   useEffect(() => {
     if (sportProp) {
@@ -314,13 +304,12 @@ export const Pitch: React.FC<PitchProps> = ({
       return;
     }
 
+    setSport('football');
     const handler = (e: Event) => {
       const detail = (e as CustomEvent).detail as { sport?: 'football' | 'handball' } | undefined;
       if (detail?.sport) setSport(detail.sport);
-      else setSport(getSportFromStorage());
     };
 
-    setSport(getSportFromStorage());
     window.addEventListener('taptics:sport-change', handler as EventListener);
     return () => window.removeEventListener('taptics:sport-change', handler as EventListener);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -947,8 +936,7 @@ export const Pitch: React.FC<PitchProps> = ({
   };
 
   // Dynamic scaling based on export mode
-  // Standard lineup shirts are ~20% smaller (48 -> 38).
-  const shirtSize = isExport ? 64 : 38;
+  const shirtSize = isExport ? 64 : 48;
   
   // Adjusted container size logic
   // If isSmallMode (Set Pieces), we allow the container to shrink to fit the content exactly.
@@ -964,8 +952,8 @@ export const Pitch: React.FC<PitchProps> = ({
   // w-6 h-6 is 1.5rem (24px). w-7 h-7 is 1.75rem (28px). w-9 h-9 is 2.25rem (36px).
   // 24px is roughly 14% smaller than 28px, fulfilling the 10% smaller request.
   const circleSizeClass = isSmallMode ? 'w-6 h-6 text-[10px]' : 'w-9 h-9 text-sm';
-  const nameTextSize = isExport ? 'text-base font-bold' : (isSmallMode ? 'text-[10px] font-bold' : 'text-[10px] font-bold');
-  const namePadding = isExport ? 'px-3 py-1' : (isSmallMode ? 'px-1.5 py-0' : 'px-1.5 py-0');
+  const nameTextSize = isExport ? 'text-base font-bold' : (isSmallMode ? 'text-[10px] font-bold' : 'text-xs font-bold');
+  const namePadding = isExport ? 'px-3 py-1' : (isSmallMode ? 'px-1.5 py-0' : 'px-2 py-0.5');
   
   const aspectRatioClass = viewMode === 'full' ? 'aspect-[5/6]' : viewMode === 'penalty' ? 'aspect-[3/2]' : 'aspect-[5/3]';
 

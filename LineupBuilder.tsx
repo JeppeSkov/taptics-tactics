@@ -87,7 +87,7 @@ const KIT_COLORS: KitColor[] = [
 ];
 
 interface LineupBuilderProps {
-  onNavigate: (page: 'home' | 'builder' | 'setpieces' | 'articles' | 'minutes' | 'drills') => void;
+  onNavigate: (page: 'home' | 'builder' | 'setpieces' | 'articles' | 'minutes' | 'drills' | 'faq') => void;
   globalPlayers: Player[];
   onGlobalPlayersUpdate: (newPlayers: Player[] | ((prev: Player[]) => Player[])) => void;
 }

@@ -11,7 +11,7 @@ import { fetchSetPiecesForUser, saveSetPiecesForUser } from '../supabaseSetPiece
 import { Flag, Users, Trash2, Palette, ChevronDown, CornerUpRight, Shield, MoveRight, User, CircleDashed, ClipboardEdit, Save, Play, Clock, Layout, X, AlertTriangle, Check, RefreshCw, Plus, Share2, Copy, Link as LinkIcon, ZoomIn, ZoomOut, Eye, Send, Undo2 } from 'lucide-react';
 
 interface SetPiecesProps {
-  onNavigate: (page: 'home' | 'builder' | 'setpieces' | 'articles' | 'minutes' | 'drills') => void;
+  onNavigate: (page: 'home' | 'builder' | 'setpieces' | 'articles' | 'minutes' | 'drills' | 'faq') => void;
   players: Player[];
   setPlayers: (newPlayers: Player[] | ((prev: Player[]) => Player[])) => void;
 }
