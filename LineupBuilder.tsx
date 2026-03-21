@@ -7,7 +7,7 @@ import { SharedView } from './components/SharedView';
 import { NavMenu } from './components/NavMenu';
 import { ScheduleCalendar } from './components/ScheduleCalendar';
 import { Player, TacticalSlot } from './types';
-import { MOCK_PLAYERS, FORMATIONS_11, FORMATIONS_8, FORMATIONS_7, BENCH_SLOTS, STORAGE_KEY } from './constants';
+import { MOCK_PLAYERS, FORMATIONS_11, FORMATIONS_9, FORMATIONS_8, FORMATIONS_7, BENCH_SLOTS, STORAGE_KEY } from './constants';
 import { LayoutGrid, Users, MessageSquare, Calendar, Edit2, Check, X, Plus, Palette, Layers, ClipboardList, Link as LinkIcon, Eye, Shield, Swords, RotateCcw, ChevronLeft, ChevronDown, AlertTriangle, Share2, Copy } from 'lucide-react';
 
 // Unicode-safe Base64 encoding (mirrors SetPieces safeBtoa)
@@ -71,7 +71,7 @@ interface LineupDraft {
   kitColor: KitColor;
   gameplan: Gameplan;
   subCount: number;
-  teamSize: 11 | 8 | 7;
+  teamSize: 11 | 9 | 8 | 7;
 }
 
 const KIT_COLORS: KitColor[] = [
@@ -189,7 +189,7 @@ export const LineupBuilder: React.FC<LineupBuilderProps> = ({
   const [tacticalPhase, setTacticalPhase] = useState<'in_possession' | 'out_possession'>(savedState?.tacticalPhase || 'in_possession');
 
   // Team Size State
-  const [teamSize, setTeamSize] = useState<11 | 8 | 7>(savedState?.teamSize || 11);
+  const [teamSize, setTeamSize] = useState<11 | 9 | 8 | 7>(savedState?.teamSize || 11);
   const [isSizeDropdownOpen, setIsSizeDropdownOpen] = useState(false);
 
   // Note: 'players' state is now managed by App.tsx and passed as prop
@@ -226,6 +226,7 @@ export const LineupBuilder: React.FC<LineupBuilderProps> = ({
   // Computed Values
   const availableFormations =
     teamSize === 11 ? FORMATIONS_11 :
+    teamSize === 9 ? FORMATIONS_9 :
     teamSize === 8 ? FORMATIONS_8 :
     FORMATIONS_7;
 
@@ -316,7 +317,7 @@ export const LineupBuilder: React.FC<LineupBuilderProps> = ({
           let s = fromSlots.find(slot => slot.id === slotId);
           // Fallback: Check global formation definitions if the player was assigned to a slot not currently visible
           if (!s && slotId) {
-             const allFormations = { ...FORMATIONS_11, ...FORMATIONS_8, ...FORMATIONS_7 };
+             const allFormations = { ...FORMATIONS_11, ...FORMATIONS_9, ...FORMATIONS_8, ...FORMATIONS_7 };
              for (const key in allFormations) {
                  const found = allFormations[key].find(fSlot => fSlot.id === slotId);
                  if (found) {
@@ -363,7 +364,7 @@ export const LineupBuilder: React.FC<LineupBuilderProps> = ({
       });
   };
 
-  const handleSizeChange = (newSize: 11 | 8 | 7) => {
+  const handleSizeChange = (newSize: 11 | 9 | 8 | 7) => {
     if (newSize === teamSize) {
       setIsSizeDropdownOpen(false);
       return;
@@ -371,6 +372,7 @@ export const LineupBuilder: React.FC<LineupBuilderProps> = ({
 
     const newFormations =
       newSize === 11 ? FORMATIONS_11 :
+      newSize === 9 ? FORMATIONS_9 :
       newSize === 8 ? FORMATIONS_8 :
       FORMATIONS_7;
     const defaultFormationName = Object.keys(newFormations)[0];
@@ -759,6 +761,12 @@ export const LineupBuilder: React.FC<LineupBuilderProps> = ({
                                 className={`w-full text-left px-3 py-2 text-sm font-medium hover:bg-slate-700 transition-colors ${teamSize === 11 ? 'text-emerald-400 bg-slate-700/50' : 'text-slate-300'}`}
                             >
                                 11 v 11
+                            </button>
+                            <button 
+                                onClick={() => handleSizeChange(9)}
+                                className={`w-full text-left px-3 py-2 text-sm font-medium hover:bg-slate-700 transition-colors ${teamSize === 9 ? 'text-emerald-400 bg-slate-700/50' : 'text-slate-300'}`}
+                            >
+                                9 v 9
                             </button>
                             <button 
                                 onClick={() => handleSizeChange(8)}

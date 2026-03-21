@@ -102,6 +102,42 @@ export const FORMATIONS_8: Record<string, TacticalSlot[]> = {
   ],
 };
 
+export const FORMATIONS_9: Record<string, TacticalSlot[]> = {
+  '3-3-2': [
+    { id: 'GK', label: 'Goalkeeper', defaultRole: 'Defend', positionGroup: 'GK', x: 50, y: 88 },
+    { id: 'DCR', label: 'Defender', defaultRole: 'Defend', positionGroup: 'DEF', x: 80, y: 74 },
+    { id: 'DC', label: 'Defender', defaultRole: 'Cover', positionGroup: 'DEF', x: 50, y: 78 },
+    { id: 'DCL', label: 'Defender', defaultRole: 'Defend', positionGroup: 'DEF', x: 20, y: 74 },
+    { id: 'MCR', label: 'Midfielder', defaultRole: 'Support', positionGroup: 'MID', x: 72, y: 48 },
+    { id: 'MC', label: 'Midfielder', defaultRole: 'Support', positionGroup: 'MID', x: 50, y: 52 },
+    { id: 'MCL', label: 'Midfielder', defaultRole: 'Support', positionGroup: 'MID', x: 28, y: 48 },
+    { id: 'STR', label: 'Striker', defaultRole: 'Attack', positionGroup: 'ATT', x: 62, y: 20 },
+    { id: 'STL', label: 'Striker', defaultRole: 'Attack', positionGroup: 'ATT', x: 38, y: 20 },
+  ],
+  '2-4-2': [
+    { id: 'GK', label: 'Goalkeeper', defaultRole: 'Defend', positionGroup: 'GK', x: 50, y: 88 },
+    { id: 'DCR', label: 'Defender', defaultRole: 'Defend', positionGroup: 'DEF', x: 70, y: 74 },
+    { id: 'DCL', label: 'Defender', defaultRole: 'Defend', positionGroup: 'DEF', x: 30, y: 74 },
+    { id: 'MR', label: 'Wide Mid', defaultRole: 'Attack', positionGroup: 'MID', x: 88, y: 46 },
+    { id: 'MCR', label: 'Center Mid', defaultRole: 'Support', positionGroup: 'MID', x: 62, y: 50 },
+    { id: 'MCL', label: 'Center Mid', defaultRole: 'Support', positionGroup: 'MID', x: 38, y: 50 },
+    { id: 'ML', label: 'Wide Mid', defaultRole: 'Attack', positionGroup: 'MID', x: 12, y: 46 },
+    { id: 'STR', label: 'Striker', defaultRole: 'Attack', positionGroup: 'ATT', x: 62, y: 20 },
+    { id: 'STL', label: 'Striker', defaultRole: 'Attack', positionGroup: 'ATT', x: 38, y: 20 },
+  ],
+  '3-4-1': [
+    { id: 'GK', label: 'Goalkeeper', defaultRole: 'Defend', positionGroup: 'GK', x: 50, y: 88 },
+    { id: 'DCR', label: 'Defender', defaultRole: 'Defend', positionGroup: 'DEF', x: 78, y: 74 },
+    { id: 'DC', label: 'Defender', defaultRole: 'Cover', positionGroup: 'DEF', x: 50, y: 78 },
+    { id: 'DCL', label: 'Defender', defaultRole: 'Defend', positionGroup: 'DEF', x: 22, y: 74 },
+    { id: 'MR', label: 'Wide Mid', defaultRole: 'Attack', positionGroup: 'MID', x: 88, y: 46 },
+    { id: 'MCR', label: 'Center Mid', defaultRole: 'Support', positionGroup: 'MID', x: 62, y: 50 },
+    { id: 'MCL', label: 'Center Mid', defaultRole: 'Support', positionGroup: 'MID', x: 38, y: 50 },
+    { id: 'ML', label: 'Wide Mid', defaultRole: 'Attack', positionGroup: 'MID', x: 12, y: 46 },
+    { id: 'ST', label: 'Striker', defaultRole: 'Attack', positionGroup: 'ATT', x: 50, y: 20 },
+  ],
+};
+
 export const FORMATIONS_7: Record<string, TacticalSlot[]> = {
   '2-3-1': [
     { id: 'GK', label: 'Goalkeeper', defaultRole: 'Defend', positionGroup: 'GK', x: 50, y: 88 },
@@ -124,7 +160,7 @@ export const FORMATIONS_7: Record<string, TacticalSlot[]> = {
 };
 
 // Combine for backward compatibility if needed, but primarily use the separated exports
-export const FORMATIONS = { ...FORMATIONS_11, ...FORMATIONS_8, ...FORMATIONS_7 };
+export const FORMATIONS = { ...FORMATIONS_11, ...FORMATIONS_9, ...FORMATIONS_8, ...FORMATIONS_7 };
 
 export const INITIAL_SLOTS: TacticalSlot[] = FORMATIONS['4-4-2'];
 

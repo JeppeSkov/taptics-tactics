@@ -192,17 +192,17 @@ export const Home: React.FC<HomeProps> = ({ onStart, onNavigate }) => {
       <main className="relative z-10 flex-grow flex flex-col items-center justify-center text-center px-4 mt-16 md:mt-24 mb-20">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-900/30 border border-emerald-500/30 text-emerald-400 text-xs font-bold uppercase tracking-widest mb-8 animate-fade-in-up">
            <Activity size={12} />
-           <span>The most advanced lineup builder</span>
+           <span>Football lineup builder for coaches</span>
         </div>
         
         <h1 className="text-5xl md:text-7xl font-black tracking-tighter mb-8 max-w-4xl leading-[0.9]">
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-400">PLAN. ANALYZE.</span>
+          <span className="text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-400">FOOTBALL LINEUP</span>
           <br />
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-emerald-600">WIN.</span>
+          <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-emerald-600">BUILDER.</span>
         </h1>
         
         <p className="text-lg text-slate-400 max-w-2xl mb-12 leading-relaxed">
-          The modern tactical playground for football minds. Build detailed squads, design complex gameplans, and share your vision with your squad or coaching staff.
+          The modern tactical playground for football minds. Build detailed squads, design gameplans, and share your match setup with players and coaching staff.
         </p>
 
         <div className="flex flex-col lg:flex-row gap-8 w-full justify-center max-w-5xl mx-auto mb-32 items-start">
@@ -218,7 +218,7 @@ export const Home: React.FC<HomeProps> = ({ onStart, onNavigate }) => {
         {/* Feature Grid */}
         <div id="features" className="w-full max-w-7xl mx-auto px-4 pb-20 scroll-mt-24">
            <div className="text-center mb-16">
-              <h2 className="text-3xl font-bold text-white mb-4">A Lineup Builder you've seen before</h2>
+              <h2 className="text-3xl font-bold text-white mb-4">Everything you need in a football lineup builder</h2>
               <p className="text-slate-400">From the training ground to match day, we've got your tactics covered.</p>
            </div>
 
