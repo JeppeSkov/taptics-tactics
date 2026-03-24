@@ -34,7 +34,6 @@ export default function App() {
     }
   }, [page]);
 
-  const MOBILE_NOTICE_DISMISSED_KEY = 'mobile_only_notice_dismissed_v1';
   const [mobileNoticeDismissed, setMobileNoticeDismissed] = useState(false);
   const [showMobileOnlyNotice, setShowMobileOnlyNotice] = useState(false);
   const dismissMobileNoticeButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -52,35 +51,31 @@ export default function App() {
   const dismissMobileNotice = () => {
     setShowMobileOnlyNotice(false);
     setMobileNoticeDismissed(true);
-    try {
-      localStorage.setItem(MOBILE_NOTICE_DISMISSED_KEY, 'true');
-    } catch (e) {
-      // eslint-disable-next-line no-console
-      console.error('Failed to persist mobile notice dismissal', e);
-    }
   };
 
-  // Mobile-only notice (shown once per device/browser).
+  // Mobile-only notice for Builder page.
   useEffect(() => {
-    try {
-      setMobileNoticeDismissed(localStorage.getItem(MOBILE_NOTICE_DISMISSED_KEY) === 'true');
-    } catch {
+    // Reset dismissal whenever user leaves Builder so it appears again
+    // next time they press "Start Building" on mobile.
+    if (page !== 'builder') {
       setMobileNoticeDismissed(false);
+      setShowMobileOnlyNotice(false);
     }
-  }, []);
+  }, [page]);
 
   useEffect(() => {
-    if (mobileNoticeDismissed) return;
+    if (page !== 'builder' || mobileNoticeDismissed) return;
 
     const checkMobile = () => {
-      setShowMobileOnlyNotice(getIsMobileDevice());
+      const isMobile = getIsMobileDevice();
+      setShowMobileOnlyNotice(isMobile);
     };
 
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mobileNoticeDismissed]);
+  }, [mobileNoticeDismissed, page]);
 
   useEffect(() => {
     if (!showMobileOnlyNotice) return;

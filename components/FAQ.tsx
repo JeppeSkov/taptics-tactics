@@ -157,8 +157,8 @@ export const FAQ: React.FC<FAQProps> = ({ onBack, onNavigate }) => {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-300 font-sans flex flex-col items-center">
       <header className="w-full bg-slate-900 border-b border-slate-800 sticky top-0 z-20">
-        <div className="max-w-3xl mx-auto px-6 py-4 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-4 min-w-0">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3 sm:gap-4 min-w-0">
             <button
               type="button"
               onClick={onBack}
@@ -167,11 +167,11 @@ export const FAQ: React.FC<FAQProps> = ({ onBack, onNavigate }) => {
             >
               <ArrowLeft size={20} />
             </button>
-            <div className="flex items-center gap-3 min-w-0">
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
               <div className="bg-red-700 p-1.5 rounded shadow-lg shadow-red-900/20 shrink-0">
                 <LayoutGrid size={18} className="text-white" />
               </div>
-              <span className="text-lg font-bold text-white tracking-tight flex items-center gap-2 truncate">
+              <span className="text-base sm:text-lg font-bold text-white tracking-tight flex items-center gap-2 truncate">
                 Taptics{' '}
                 <span className="text-slate-500 font-normal hidden sm:inline">Help</span>
                 <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded border border-emerald-500/30 uppercase tracking-wider shrink-0">
@@ -183,16 +183,16 @@ export const FAQ: React.FC<FAQProps> = ({ onBack, onNavigate }) => {
         </div>
       </header>
 
-      <main className="w-full max-w-3xl px-6 py-12 flex flex-col gap-10">
+      <main className="w-full max-w-3xl px-4 sm:px-6 py-8 sm:py-12 flex flex-col gap-8 sm:gap-10">
         <header className="text-center sm:text-left">
           <div className="inline-flex items-center gap-2 text-emerald-400/90 text-xs font-bold uppercase tracking-widest mb-4">
             <HelpCircle size={14} aria-hidden />
             <span>Football lineup builder</span>
           </div>
-          <h1 className="text-3xl sm:text-4xl font-black text-white mb-4 tracking-tight leading-tight">
+          <h1 className="text-2xl sm:text-4xl font-black text-white mb-3 sm:mb-4 tracking-tight leading-tight">
             Football lineup builder FAQ
           </h1>
-          <p className="text-lg text-slate-400 leading-relaxed max-w-2xl">
+          <p className="text-base sm:text-lg text-slate-400 leading-relaxed max-w-2xl">
             Clear answers for coaches and analysts searching for a{' '}
             <strong className="text-slate-200 font-semibold">football lineup builder</strong>, formation
             planning, sharing lineups, and how Taptics fits into your weekly workflow.
@@ -208,23 +208,23 @@ export const FAQ: React.FC<FAQProps> = ({ onBack, onNavigate }) => {
               key={index}
               className="group bg-slate-900/50 border border-slate-800 rounded-xl open:border-emerald-500/25 open:bg-slate-900/70 transition-colors"
             >
-              <summary className="cursor-pointer list-none px-5 py-4 font-bold text-white text-left flex items-start gap-3 [&::-webkit-details-marker]:hidden">
+              <summary className="cursor-pointer list-none px-4 sm:px-5 py-4 font-bold text-white text-left flex items-start gap-3 [&::-webkit-details-marker]:hidden">
                 <span className="mt-0.5 text-emerald-500 shrink-0" aria-hidden>
                   ·
                 </span>
-                <span className="text-base leading-snug">
+                <span className="text-sm sm:text-base leading-snug">
                   <span className="text-slate-500 font-normal mr-2">{index + 1}.</span>
                   {item.question}
                 </span>
               </summary>
-              <div className="px-5 pb-5 pl-12 pr-6 border-t border-slate-800/80 pt-3">
+              <div className="px-4 sm:px-5 pb-4 sm:pb-5 pl-10 sm:pl-12 pr-4 sm:pr-6 border-t border-slate-800/80 pt-3">
                 <p className="text-slate-400 text-sm md:text-base leading-relaxed">{item.answer}</p>
               </div>
             </details>
           ))}
         </section>
 
-        <section className="rounded-2xl border border-slate-800 bg-slate-900/40 p-8 text-center">
+        <section className="rounded-2xl border border-slate-800 bg-slate-900/40 p-5 sm:p-8 text-center">
           <h2 className="text-xl font-bold text-white mb-2">Ready to build your lineup?</h2>
           <p className="text-slate-400 text-sm mb-6 max-w-md mx-auto">
             Open the football lineup builder to create formations, manage your squad, and share your setup.
@@ -239,7 +239,7 @@ export const FAQ: React.FC<FAQProps> = ({ onBack, onNavigate }) => {
         </section>
       </main>
 
-      <footer className="w-full border-t border-slate-900 py-8 mt-auto text-center text-slate-600 text-xs max-w-3xl px-6">
+      <footer className="w-full border-t border-slate-900 py-8 mt-auto text-center text-slate-600 text-xs max-w-3xl px-4 sm:px-6">
         <p>
           &copy; {new Date().getFullYear()} Taptics. Football lineup builder tools for coaches and teams.
         </p>

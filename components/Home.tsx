@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { ArrowRight, LayoutGrid, Activity, Share2, Users, Shield, Swords, Calendar, Flag } from 'lucide-react';
+import { ArrowRight, LayoutGrid, Activity, Share2, Users, Shield, Swords, Calendar, Flag, Menu, X } from 'lucide-react';
 import { useAuth } from '../supabaseAuth';
 
 interface HomeProps {
@@ -15,7 +15,8 @@ export const Home: React.FC<HomeProps> = ({ onStart, onNavigate }) => {
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-   const [authOpen, setAuthOpen] = useState(false);
+  const [authOpen, setAuthOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const scrollToFeatures = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -40,7 +41,7 @@ export const Home: React.FC<HomeProps> = ({ onStart, onNavigate }) => {
       </div>
 
       {/* Header */}
-      <header className="relative z-10 w-full max-w-7xl mx-auto px-6 py-6 flex justify-between items-center">
+      <header className="relative z-10 w-full max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6 flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
            <div className="bg-red-700 p-2 rounded-lg shadow-lg shadow-red-900/20">
               <LayoutGrid size={24} className="text-white" />
@@ -70,7 +71,7 @@ export const Home: React.FC<HomeProps> = ({ onStart, onNavigate }) => {
              FAQ
            </a>
         </nav>
-        <div className="flex items-center gap-3 relative">
+        <div className="hidden md:flex items-center gap-2 sm:gap-3 relative">
           {!loading && user && (
             <div className="hidden sm:flex flex-col items-end text-[11px] text-slate-400 mr-2">
               <span className="font-semibold text-slate-200">Signed in</span>
@@ -98,7 +99,7 @@ export const Home: React.FC<HomeProps> = ({ onStart, onNavigate }) => {
 
           {/* Auth dropdown */}
           {!loading && !user && authOpen && (
-            <div className="absolute right-0 top-full mt-2 w-72 bg-slate-950/95 border border-slate-800 rounded-xl p-4 shadow-2xl z-50 text-left">
+            <div className="absolute right-0 top-full mt-2 w-[min(20rem,calc(100vw-2rem))] bg-slate-950/95 border border-slate-800 rounded-xl p-4 shadow-2xl z-50 text-left">
               <div className="flex items-center justify-between mb-2">
                 <h2 className="text-xs font-semibold text-slate-200">
                   {mode === 'login' ? 'Log in to save your work' : 'Create a free account'}
@@ -196,26 +197,204 @@ export const Home: React.FC<HomeProps> = ({ onStart, onNavigate }) => {
             </button>
           )}
         </div>
+        <button
+          type="button"
+          onClick={() => {
+            setMobileMenuOpen((v) => !v);
+            setAuthOpen(false);
+          }}
+          className="md:hidden p-2 rounded-lg border border-slate-700 bg-slate-900/70 text-slate-200 hover:bg-slate-800 transition-colors"
+          aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
+        >
+          {mobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
+        </button>
       </header>
 
+      {mobileMenuOpen && (
+        <nav className="relative z-10 w-full max-w-7xl px-4 sm:px-6 md:hidden">
+          <div className="rounded-xl border border-slate-800 bg-slate-900/95 shadow-2xl p-3 flex flex-col gap-2">
+            <button
+              type="button"
+              onClick={(e) => {
+                scrollToFeatures(e);
+                setMobileMenuOpen(false);
+              }}
+              className="w-full text-left rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm font-semibold text-slate-300 hover:text-emerald-400 hover:border-emerald-500/40 transition-colors"
+            >
+              Features
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                onNavigate('articles');
+                setMobileMenuOpen(false);
+              }}
+              className="w-full text-left rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm font-semibold text-slate-300 hover:text-emerald-400 hover:border-emerald-500/40 transition-colors"
+            >
+              Articles
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                onNavigate('faq');
+                setMobileMenuOpen(false);
+              }}
+              className="w-full text-left rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm font-semibold text-slate-300 hover:text-emerald-400 hover:border-emerald-500/40 transition-colors"
+            >
+              FAQ
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                onStart();
+                setMobileMenuOpen(false);
+              }}
+              className="w-full rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 text-sm font-bold transition-colors shadow-lg mt-1"
+            >
+              Launch Builder
+            </button>
+
+            {!loading && !user && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setError(null);
+                    setAuthOpen((prev) => !prev);
+                  }}
+                  className="w-full rounded-lg bg-transparent hover:bg-slate-800 text-slate-200 px-4 py-2 text-sm font-semibold border border-slate-700 transition-all"
+                >
+                  Sign in
+                </button>
+                {authOpen && (
+                  <div className="w-full bg-slate-950/95 border border-slate-800 rounded-xl p-4 shadow-2xl text-left">
+                    <div className="flex items-center justify-between mb-2">
+                      <h2 className="text-xs font-semibold text-slate-200">
+                        {mode === 'login' ? 'Log in to save your work' : 'Create a free account'}
+                      </h2>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setError(null);
+                          setMode((prev) => (prev === 'login' ? 'signup' : 'login'));
+                        }}
+                        className="text-[10px] text-emerald-400 hover:text-emerald-300 underline-offset-2 hover:underline"
+                      >
+                        {mode === 'login' ? 'Need an account?' : 'Already have an account?'}
+                      </button>
+                    </div>
+                    <form
+                      className="space-y-2"
+                      onSubmit={async (e) => {
+                        e.preventDefault();
+                        setSubmitting(true);
+                        setError(null);
+                        try {
+                          if (mode === 'login') {
+                            await signIn(email, password);
+                          } else {
+                            await signUp(email, password);
+                          }
+                          setAuthOpen(false);
+                          setMobileMenuOpen(false);
+                        } catch (err: any) {
+                          setError(err?.message || 'Something went wrong');
+                        } finally {
+                          setSubmitting(false);
+                        }
+                      }}
+                    >
+                      <div className="flex flex-col gap-1 text-left">
+                        <label className="text-[10px] font-semibold text-slate-300">Email</label>
+                        <input
+                          type="email"
+                          required
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          className="w-full rounded-md bg-slate-950/60 border border-slate-700 px-2 py-1.5 text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
+                          placeholder="you@club.com"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1 text-left">
+                        <label className="text-[10px] font-semibold text-slate-300">Password</label>
+                        <input
+                          type="password"
+                          required
+                          minLength={6}
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          className="w-full rounded-md bg-slate-950/60 border border-slate-700 px-2 py-1.5 text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
+                          placeholder="Min. 6 characters"
+                        />
+                      </div>
+                      {error && <p className="text-[10px] text-red-400">{error}</p>}
+                      <button
+                        type="submit"
+                        disabled={submitting}
+                        className="w-full mt-1 inline-flex items-center justify-center rounded-md bg-slate-800 hover:bg-slate-700 disabled:opacity-60 disabled:cursor-not-allowed px-2 py-1.5 text-[11px] font-semibold text-slate-100 border border-slate-700 transition-colors"
+                      >
+                        {submitting
+                          ? mode === 'login'
+                            ? 'Logging in…'
+                            : 'Creating account…'
+                          : mode === 'login'
+                            ? 'Log in'
+                            : 'Sign up'}
+                      </button>
+                      <p className="text-[9px] text-slate-500 mt-1">
+                        Use this account to sync squads, lineups, set pieces and drills across devices later.
+                      </p>
+                    </form>
+                  </div>
+                )}
+              </>
+            )}
+
+            {!loading && user && (
+              <div className="rounded-lg border border-slate-800 bg-slate-900 px-3 py-2">
+                <div className="text-[11px] text-slate-400 mb-2">
+                  <span className="font-semibold text-slate-200">Signed in</span>
+                  <div className="truncate">{user.email}</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setError(null);
+                    try {
+                      await signOut();
+                      setMobileMenuOpen(false);
+                    } catch (err: any) {
+                      setError(err?.message || 'Failed to sign out');
+                    }
+                  }}
+                  className="w-full bg-transparent hover:bg-slate-800 text-slate-200 px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-700 transition-all"
+                >
+                  Sign out
+                </button>
+              </div>
+            )}
+          </div>
+        </nav>
+      )}
+
       {/* Hero Section */}
-      <main className="relative z-10 flex-grow flex flex-col items-center justify-center text-center px-4 mt-16 md:mt-24 mb-20">
+      <main className="relative z-10 flex-grow flex flex-col items-center justify-center text-center px-4 mt-10 sm:mt-14 md:mt-24 mb-16 sm:mb-20">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-900/30 border border-emerald-500/30 text-emerald-400 text-xs font-bold uppercase tracking-widest mb-8 animate-fade-in-up">
            <Activity size={12} />
            <span>Football lineup builder for coaches</span>
         </div>
         
-        <h1 className="text-5xl md:text-7xl font-black tracking-tighter mb-8 max-w-4xl leading-[0.9]">
+        <h1 className="text-4xl sm:text-5xl md:text-7xl font-black tracking-tighter mb-6 sm:mb-8 max-w-4xl leading-[0.9]">
           <span className="text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-400">FOOTBALL LINEUP</span>
           <br />
           <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-emerald-600">BUILDER.</span>
         </h1>
         
-        <p className="text-lg text-slate-400 max-w-2xl mb-12 leading-relaxed">
+        <p className="text-base sm:text-lg text-slate-400 max-w-2xl mb-10 sm:mb-12 leading-relaxed">
           The modern tactical playground for football minds. Build detailed squads, design gameplans, and share your match setup with players and coaching staff.
         </p>
 
-        <div className="flex flex-col lg:flex-row gap-8 w-full justify-center max-w-5xl mx-auto mb-32 items-start">
+        <div className="flex flex-col lg:flex-row gap-6 sm:gap-8 w-full justify-center max-w-5xl mx-auto mb-20 sm:mb-28 md:mb-32 items-start">
            <button 
              onClick={onStart}
             className="group relative flex items-center justify-center gap-3 bg-emerald-600 hover:bg-emerald-500 text-white px-8 py-4 rounded-xl text-lg font-bold shadow-2xl shadow-emerald-900/50 transition-all transform hover:-translate-y-1 w-full lg:w-auto"
@@ -226,15 +405,15 @@ export const Home: React.FC<HomeProps> = ({ onStart, onNavigate }) => {
         </div>
 
         {/* Feature Grid */}
-        <div id="features" className="w-full max-w-7xl mx-auto px-4 pb-20 scroll-mt-24">
-           <div className="text-center mb-16">
-              <h2 className="text-3xl font-bold text-white mb-4">Everything you need in a football lineup builder</h2>
+        <div id="features" className="w-full max-w-7xl mx-auto px-4 pb-14 sm:pb-20 scroll-mt-24">
+           <div className="text-center mb-10 sm:mb-16">
+              <h2 className="text-2xl sm:text-3xl font-bold text-white mb-4">Everything you need in a football lineup builder</h2>
               <p className="text-slate-400">From the training ground to match day, we've got your tactics covered.</p>
            </div>
 
            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                {/* Feature 1 */}
-               <div className="bg-slate-900/50 border border-slate-800 p-8 rounded-2xl hover:border-emerald-500/50 transition-all group text-left hover:bg-slate-800/50">
+               <div className="bg-slate-900/50 border border-slate-800 p-6 sm:p-8 rounded-2xl hover:border-emerald-500/50 transition-all group text-left hover:bg-slate-800/50">
                   <div className="w-12 h-12 bg-slate-800 rounded-xl flex items-center justify-center mb-6 group-hover:bg-emerald-900/30 group-hover:scale-110 transition-all duration-300">
                      <LayoutGrid className="text-emerald-400" />
                   </div>
@@ -245,7 +424,7 @@ export const Home: React.FC<HomeProps> = ({ onStart, onNavigate }) => {
                </div>
                
                {/* Feature 2 */}
-               <div className="bg-slate-900/50 border border-slate-800 p-8 rounded-2xl hover:border-blue-500/50 transition-all group text-left hover:bg-slate-800/50">
+               <div className="bg-slate-900/50 border border-slate-800 p-6 sm:p-8 rounded-2xl hover:border-blue-500/50 transition-all group text-left hover:bg-slate-800/50">
                   <div className="w-12 h-12 bg-slate-800 rounded-xl flex items-center justify-center mb-6 group-hover:bg-blue-900/30 group-hover:scale-110 transition-all duration-300">
                      <Users className="text-blue-400" />
                   </div>
@@ -256,7 +435,7 @@ export const Home: React.FC<HomeProps> = ({ onStart, onNavigate }) => {
                </div>
 
                {/* Feature 3 */}
-               <div className="bg-slate-900/50 border border-slate-800 p-8 rounded-2xl hover:border-purple-500/50 transition-all group text-left hover:bg-slate-800/50">
+               <div className="bg-slate-900/50 border border-slate-800 p-6 sm:p-8 rounded-2xl hover:border-purple-500/50 transition-all group text-left hover:bg-slate-800/50">
                   <div className="w-12 h-12 bg-slate-800 rounded-xl flex items-center justify-center mb-6 group-hover:bg-purple-900/30 group-hover:scale-110 transition-all duration-300">
                      <Swords className="text-purple-400" />
                   </div>
@@ -267,7 +446,7 @@ export const Home: React.FC<HomeProps> = ({ onStart, onNavigate }) => {
                </div>
 
                {/* Feature 4 */}
-               <div className="bg-slate-900/50 border border-slate-800 p-8 rounded-2xl hover:border-orange-500/50 transition-all group text-left hover:bg-slate-800/50">
+               <div className="bg-slate-900/50 border border-slate-800 p-6 sm:p-8 rounded-2xl hover:border-orange-500/50 transition-all group text-left hover:bg-slate-800/50">
                   <div className="w-12 h-12 bg-slate-800 rounded-xl flex items-center justify-center mb-6 group-hover:bg-orange-900/30 group-hover:scale-110 transition-all duration-300">
                      <Share2 className="text-orange-400" />
                   </div>
@@ -278,7 +457,7 @@ export const Home: React.FC<HomeProps> = ({ onStart, onNavigate }) => {
                </div>
 
                {/* Feature 5 */}
-               <div className="bg-slate-900/50 border border-slate-800 p-8 rounded-2xl hover:border-red-500/50 transition-all group text-left hover:bg-slate-800/50">
+               <div className="bg-slate-900/50 border border-slate-800 p-6 sm:p-8 rounded-2xl hover:border-red-500/50 transition-all group text-left hover:bg-slate-800/50">
                   <div className="w-12 h-12 bg-slate-800 rounded-xl flex items-center justify-center mb-6 group-hover:bg-red-900/30 group-hover:scale-110 transition-all duration-300">
                      <Shield className="text-red-400" />
                   </div>

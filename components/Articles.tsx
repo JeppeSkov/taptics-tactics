@@ -130,8 +130,8 @@ export const Articles: React.FC<ArticlesProps> = ({ onBack, onNavigate }) => {
     <div className="min-h-screen bg-slate-950 text-slate-300 font-sans flex flex-col items-center">
       {/* Header */}
       <header className="w-full bg-slate-900 border-b border-slate-800 sticky top-0 z-20">
-        <div className="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between">
-            <div className="flex items-center gap-4">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-3 sm:gap-4 min-w-0">
                 <button 
                   onClick={onBack}
                   className="p-2 -ml-2 hover:bg-slate-800 rounded-full transition-colors group text-slate-400 hover:text-white"
@@ -139,12 +139,12 @@ export const Articles: React.FC<ArticlesProps> = ({ onBack, onNavigate }) => {
                 >
                   <ArrowLeft size={20} />
                 </button>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                     <div className="bg-red-700 p-1.5 rounded shadow-lg shadow-red-900/20">
                         <LayoutGrid size={18} className="text-white" />
                     </div>
-                    <span className="text-lg font-bold text-white tracking-tight flex items-center gap-2">
-                        Taptics <span className="text-slate-500 font-normal">Articles</span>
+                    <span className="text-base sm:text-lg font-bold text-white tracking-tight flex items-center gap-2 truncate">
+                        Taptics <span className="text-slate-500 font-normal hidden sm:inline">Articles</span>
                         <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded border border-emerald-500/30 uppercase tracking-wider">Beta</span>
                     </span>
                 </div>
@@ -153,15 +153,15 @@ export const Articles: React.FC<ArticlesProps> = ({ onBack, onNavigate }) => {
       </header>
 
       {/* Main Content */}
-      <main className="w-full max-w-4xl px-6 py-12 flex flex-col gap-12">
-        <div className="text-center mb-8">
-            <h1 className="text-4xl md:text-5xl font-black text-white mb-4 tracking-tight">Tactical Insights</h1>
-            <p className="text-lg text-slate-400 max-w-2xl mx-auto">Deep dives into football strategy, squad management, and mastering the digital touchline.</p>
+      <main className="w-full max-w-4xl px-4 sm:px-6 py-8 sm:py-12 flex flex-col gap-10 sm:gap-12">
+        <div className="text-center mb-4 sm:mb-8">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-black text-white mb-3 sm:mb-4 tracking-tight">Tactical Insights</h1>
+            <p className="text-base sm:text-lg text-slate-400 max-w-2xl mx-auto">Deep dives into football strategy, squad management, and mastering the digital touchline.</p>
         </div>
 
         <div className="grid gap-12">
             {articles.map((article) => (
-                <article key={article.id} className="bg-slate-900/50 border border-slate-800 rounded-2xl p-8 hover:border-emerald-500/30 transition-all duration-300 group">
+                <article key={article.id} className="bg-slate-900/50 border border-slate-800 rounded-2xl p-5 sm:p-8 hover:border-emerald-500/30 transition-all duration-300 group">
                     <div className="flex flex-col md:flex-row gap-6 md:items-start justify-between mb-6">
                         <div>
                             <h2 className="text-2xl md:text-3xl font-bold text-white mb-2 group-hover:text-emerald-400 transition-colors leading-tight">
@@ -193,7 +193,7 @@ export const Articles: React.FC<ArticlesProps> = ({ onBack, onNavigate }) => {
         </div>
 
         {/* SEO Footer for this page */}
-        <div className="mt-12 p-8 bg-slate-900 rounded-xl text-center border border-slate-800">
+        <div className="mt-8 sm:mt-12 p-5 sm:p-8 bg-slate-900 rounded-xl text-center border border-slate-800">
             <h3 className="text-white font-bold mb-2">Ready to apply these tactics?</h3>
             <p className="text-slate-400 text-sm mb-6">Use the most advanced lineup builder for football to dominate your next match.</p>
             <button 
