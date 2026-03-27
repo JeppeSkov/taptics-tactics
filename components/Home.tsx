@@ -10,6 +10,7 @@ interface HomeProps {
 
 export const Home: React.FC<HomeProps> = ({ onStart, onNavigate }) => {
   const { user, loading, signIn, signUp, signOut } = useAuth();
+  const showAuthCta = false;
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -72,7 +73,7 @@ export const Home: React.FC<HomeProps> = ({ onStart, onNavigate }) => {
            </a>
         </nav>
         <div className="hidden md:flex items-center gap-2 sm:gap-3 relative">
-          {!loading && user && (
+          {showAuthCta && !loading && user && (
             <div className="hidden sm:flex flex-col items-end text-[11px] text-slate-400 mr-2">
               <span className="font-semibold text-slate-200">Signed in</span>
               <span className="truncate max-w-[160px]">{user.email}</span>
@@ -84,7 +85,7 @@ export const Home: React.FC<HomeProps> = ({ onStart, onNavigate }) => {
           >
             Launch Builder
           </button>
-          {!loading && !user && (
+          {showAuthCta && !loading && !user && (
             <button
               type="button"
               onClick={() => {
@@ -98,7 +99,7 @@ export const Home: React.FC<HomeProps> = ({ onStart, onNavigate }) => {
           )}
 
           {/* Auth dropdown */}
-          {!loading && !user && authOpen && (
+          {showAuthCta && !loading && !user && authOpen && (
             <div className="absolute right-0 top-full mt-2 w-[min(20rem,calc(100vw-2rem))] bg-slate-950/95 border border-slate-800 rounded-xl p-4 shadow-2xl z-50 text-left">
               <div className="flex items-center justify-between mb-2">
                 <h2 className="text-xs font-semibold text-slate-200">
@@ -180,7 +181,7 @@ export const Home: React.FC<HomeProps> = ({ onStart, onNavigate }) => {
           )}
 
           {/* Signed-in header actions */}
-          {!loading && user && (
+          {showAuthCta && !loading && user && (
             <button
               type="button"
               onClick={async () => {
@@ -254,7 +255,7 @@ export const Home: React.FC<HomeProps> = ({ onStart, onNavigate }) => {
               Launch Builder
             </button>
 
-            {!loading && !user && (
+            {showAuthCta && !loading && !user && (
               <>
                 <button
                   type="button"
@@ -350,7 +351,7 @@ export const Home: React.FC<HomeProps> = ({ onStart, onNavigate }) => {
               </>
             )}
 
-            {!loading && user && (
+            {showAuthCta && !loading && user && (
               <div className="rounded-lg border border-slate-800 bg-slate-900 px-3 py-2">
                 <div className="text-[11px] text-slate-400 mb-2">
                   <span className="font-semibold text-slate-200">Signed in</span>
