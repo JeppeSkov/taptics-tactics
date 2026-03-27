@@ -20,6 +20,8 @@ declare global {
 }
 
 type AppPage = 'home' | 'builder' | 'articles' | 'setpieces' | 'minutes' | 'drills' | 'faq';
+const LIVE_PRESENCE_KEY = 'taptics_live_presence_v1';
+const LIVE_PRESENCE_SESSION_KEY = 'taptics_live_presence_session_v1';
 const PAGE_PATHS: Record<AppPage, string> = {
   home: '/',
   builder: '/builder',
@@ -123,6 +125,67 @@ export default function App() {
     return () => window.removeEventListener('resize', checkMobile);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mobileNoticeDismissed, page]);
+
+  useEffect(() => {
+    const getSessionId = () => {
+      try {
+        const existing = sessionStorage.getItem(LIVE_PRESENCE_SESSION_KEY);
+        if (existing) return existing;
+        const created = `coach_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+        sessionStorage.setItem(LIVE_PRESENCE_SESSION_KEY, created);
+        return created;
+      } catch {
+        return `coach_fallback_${Date.now()}`;
+      }
+    };
+
+    const sessionId = getSessionId();
+    const PRESENCE_TTL_MS = 90_000;
+
+    const updatePresence = () => {
+      try {
+        const now = Date.now();
+        const raw = localStorage.getItem(LIVE_PRESENCE_KEY);
+        const parsed = raw ? JSON.parse(raw) : {};
+        const next: Record<string, { page: AppPage; ts: number }> = {};
+        if (parsed && typeof parsed === 'object') {
+          Object.entries(parsed).forEach(([key, value]) => {
+            const v = value as { page?: AppPage; ts?: number };
+            if (typeof v?.ts === 'number' && now - v.ts <= PRESENCE_TTL_MS) {
+              next[key] = { page: (v.page as AppPage) || 'home', ts: v.ts };
+            }
+          });
+        }
+        next[sessionId] = { page, ts: now };
+        localStorage.setItem(LIVE_PRESENCE_KEY, JSON.stringify(next));
+      } catch {
+        // ignore local presence failures
+      }
+    };
+
+    const removePresence = () => {
+      try {
+        const raw = localStorage.getItem(LIVE_PRESENCE_KEY);
+        const parsed = raw ? JSON.parse(raw) : {};
+        if (parsed && typeof parsed === 'object' && sessionId in parsed) {
+          delete parsed[sessionId];
+          localStorage.setItem(LIVE_PRESENCE_KEY, JSON.stringify(parsed));
+        }
+      } catch {
+        // ignore local presence failures
+      }
+    };
+
+    updatePresence();
+    const interval = window.setInterval(updatePresence, 15_000);
+    window.addEventListener('beforeunload', removePresence);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('beforeunload', removePresence);
+      // Keep presence entry while navigating inside the SPA.
+      updatePresence();
+    };
+  }, [page]);
 
   useEffect(() => {
     if (!showMobileOnlyNotice) return;

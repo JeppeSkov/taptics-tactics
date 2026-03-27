@@ -1,5 +1,5 @@
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { SquadList } from './components/SquadList';
 import { Pitch } from './components/Pitch';
 import { Substitutes } from './components/Substitutes';
@@ -97,6 +97,9 @@ export const LineupBuilder: React.FC<LineupBuilderProps> = ({
     globalPlayers: players, // Rename prop to 'players' for internal convenience
     onGlobalPlayersUpdate: setPlayers 
 }) => {
+  const LIVE_PRESENCE_KEY = 'taptics_live_presence_v1';
+  const LIVE_PRESENCE_SESSION_KEY = 'taptics_live_presence_session_v1';
+
   // --- Initialization Logic ---
   const loadSavedState = () => {
     try {
@@ -222,6 +225,7 @@ export const LineupBuilder: React.FC<LineupBuilderProps> = ({
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const [isShareWarningOpen, setIsShareWarningOpen] = useState(false);
   const [isShareDropdownOpen, setIsShareDropdownOpen] = useState(false);
+  const [presenceTick, setPresenceTick] = useState(0);
 
   // Computed Values
   const availableFormations =
@@ -263,6 +267,21 @@ export const LineupBuilder: React.FC<LineupBuilderProps> = ({
     slotsInPossession, slotsOutPossession, kitColor, gameplan, subCount, nextMatch, isSharedMode, teamSize
   ]);
 
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === LIVE_PRESENCE_KEY) {
+        setPresenceTick((v) => v + 1);
+      }
+    };
+    const interval = window.setInterval(() => setPresenceTick((v) => v + 1), 15_000);
+    window.addEventListener('storage', onStorage);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('storage', onStorage);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleResetData = () => {
     if (confirm("Are you sure you want to reset all data to defaults? This cannot be undone.")) {
       localStorage.removeItem(STORAGE_KEY);
@@ -273,6 +292,32 @@ export const LineupBuilder: React.FC<LineupBuilderProps> = ({
   // Helper to get current active slots
   const activeSlots = tacticalPhase === 'in_possession' ? slotsInPossession : slotsOutPossession;
   const activeFormation = tacticalPhase === 'in_possession' ? currentFormationInPossession : currentFormationOutPossession;
+
+  const breakingNews = useMemo(() => {
+    try {
+      const sessionId = sessionStorage.getItem(LIVE_PRESENCE_SESSION_KEY);
+      const raw = localStorage.getItem(LIVE_PRESENCE_KEY);
+      const parsed = raw ? JSON.parse(raw) : {};
+      const now = Date.now();
+      const ttl = 90_000;
+      let totalOthers = 0;
+
+      Object.entries(parsed ?? {}).forEach(([key, value]) => {
+        if (key === sessionId) return;
+        const v = value as { page?: string; ts?: number };
+        if (typeof v?.ts !== 'number' || now - v.ts > ttl) return;
+        totalOthers += 1;
+      });
+
+      if (totalOthers === 0) {
+        return 'No other coaches active right now — share this builder to a coach you respect.';
+      }
+
+      return `${totalOthers} other coach${totalOthers === 1 ? '' : 'es'} currently active on Taptics Squad.`;
+    } catch {
+      return 'No other coaches active right now — share this builder to a coach you respect.';
+    }
+  }, [presenceTick]);
 
   const handlePreviewSharedView = () => {
     const slotsToShare = activeSlots;
@@ -842,6 +887,13 @@ export const LineupBuilder: React.FC<LineupBuilderProps> = ({
                 </div>
             </div>
           </header>
+
+          <div className="mb-2 rounded-lg border border-green-500/25 bg-green-500/5 px-2.5 py-1.5 flex items-center gap-1.5">
+            <p className="text-[11px] sm:text-xs text-green-500/80">
+              <span className="font-bold uppercase tracking-wide mr-1">Current Activity:</span>
+              {breakingNews}
+            </p>
+          </div>
 
           <ScheduleCalendar />
 
