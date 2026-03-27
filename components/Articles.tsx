@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { ArrowLeft, LayoutGrid, ArrowRight, Flag } from 'lucide-react';
 
 interface ArticlesProps {
@@ -7,7 +7,51 @@ interface ArticlesProps {
   onNavigate: (page: 'home' | 'builder' | 'setpieces' | 'articles' | 'minutes' | 'drills' | 'faq') => void;
 }
 
+function buildArticlesBreadcrumbJsonLd() {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      {
+        '@type': 'ListItem',
+        position: 1,
+        name: 'Home',
+        item: 'https://tapticssquad.com/',
+      },
+      {
+        '@type': 'ListItem',
+        position: 2,
+        name: 'Articles',
+        item: 'https://tapticssquad.com/articles',
+      },
+    ],
+  };
+}
+
 export const Articles: React.FC<ArticlesProps> = ({ onBack, onNavigate }) => {
+  useEffect(() => {
+    const prevTitle = document.title;
+    const meta = document.querySelector('meta[name="description"]');
+    const prevDesc = meta?.getAttribute('content') ?? null;
+
+    document.title = 'Football Tactics Articles | Lineup Builder Insights | Taptics';
+    const description =
+      'Read football tactics articles about lineup building, formations, squad planning, set pieces, and coaching workflows.';
+    meta?.setAttribute('content', description);
+
+    const breadcrumbScript = document.createElement('script');
+    breadcrumbScript.type = 'application/ld+json';
+    breadcrumbScript.id = 'taptics-articles-breadcrumb-jsonld';
+    breadcrumbScript.text = JSON.stringify(buildArticlesBreadcrumbJsonLd());
+    document.head.appendChild(breadcrumbScript);
+
+    return () => {
+      document.title = prevTitle;
+      if (prevDesc !== null) meta?.setAttribute('content', prevDesc);
+      document.getElementById('taptics-articles-breadcrumb-jsonld')?.remove();
+    };
+  }, []);
+
   const articles = [
     {
       id: 1,

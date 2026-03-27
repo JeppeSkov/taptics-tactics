@@ -125,6 +125,27 @@ function buildFaqJsonLd(items: FaqItem[]) {
   };
 }
 
+function buildBreadcrumbJsonLd() {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      {
+        '@type': 'ListItem',
+        position: 1,
+        name: 'Home',
+        item: 'https://tapticssquad.com/',
+      },
+      {
+        '@type': 'ListItem',
+        position: 2,
+        name: 'FAQ',
+        item: 'https://tapticssquad.com/faq',
+      },
+    ],
+  };
+}
+
 interface FAQProps {
   onBack: () => void;
   onNavigate: (page: 'home' | 'builder' | 'setpieces' | 'articles' | 'minutes' | 'drills' | 'faq') => void;
@@ -147,10 +168,17 @@ export const FAQ: React.FC<FAQProps> = ({ onBack, onNavigate }) => {
     script.text = JSON.stringify(buildFaqJsonLd(FOOTBALL_LINEUP_BUILDER_FAQ));
     document.head.appendChild(script);
 
+    const breadcrumbScript = document.createElement('script');
+    breadcrumbScript.type = 'application/ld+json';
+    breadcrumbScript.id = 'taptics-faq-breadcrumb-jsonld';
+    breadcrumbScript.text = JSON.stringify(buildBreadcrumbJsonLd());
+    document.head.appendChild(breadcrumbScript);
+
     return () => {
       document.title = prevTitle;
       if (prevDesc !== null) meta?.setAttribute('content', prevDesc);
       document.getElementById('taptics-faq-jsonld')?.remove();
+      document.getElementById('taptics-faq-breadcrumb-jsonld')?.remove();
     };
   }, []);
 

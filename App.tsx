@@ -20,6 +20,34 @@ declare global {
 }
 
 type AppPage = 'home' | 'builder' | 'articles' | 'setpieces' | 'minutes' | 'drills' | 'faq';
+const PAGE_PATHS: Record<AppPage, string> = {
+  home: '/',
+  builder: '/builder',
+  articles: '/articles',
+  setpieces: '/set-pieces',
+  minutes: '/minutes',
+  drills: '/drills',
+  faq: '/faq',
+};
+
+const getPageFromPath = (pathname: string): AppPage => {
+  switch (pathname) {
+    case '/builder':
+      return 'builder';
+    case '/articles':
+      return 'articles';
+    case '/set-pieces':
+      return 'setpieces';
+    case '/minutes':
+      return 'minutes';
+    case '/drills':
+      return 'drills';
+    case '/faq':
+      return 'faq';
+    default:
+      return 'home';
+  }
+};
 
 export default function App() {
   const [page, setPage] = useState<AppPage>('home');
@@ -37,6 +65,25 @@ export default function App() {
   const [mobileNoticeDismissed, setMobileNoticeDismissed] = useState(false);
   const [showMobileOnlyNotice, setShowMobileOnlyNotice] = useState(false);
   const dismissMobileNoticeButtonRef = useRef<HTMLButtonElement | null>(null);
+
+  const buildUrlForPage = (nextPage: AppPage): string => {
+    const params = new URLSearchParams(window.location.search);
+    const keepShareParams =
+      (nextPage === 'builder' && params.has('data')) ||
+      (nextPage === 'setpieces' && params.has('sp_data')) ||
+      (nextPage === 'drills' && params.has('ts_data'));
+    return keepShareParams ? `${PAGE_PATHS[nextPage]}?${params.toString()}` : PAGE_PATHS[nextPage];
+  };
+
+  const navigateToPage = (nextPage: AppPage, replace = false) => {
+    setPage(nextPage);
+    const nextUrl = buildUrlForPage(nextPage);
+    const currentUrl = `${window.location.pathname}${window.location.search}`;
+    if (nextUrl !== currentUrl) {
+      if (replace) window.history.replaceState({}, '', nextUrl);
+      else window.history.pushState({}, '', nextUrl);
+    }
+  };
 
   const getIsMobileDevice = () => {
     // Width-based detection handles "tablet in browser" better than UA sniffing.
@@ -173,15 +220,24 @@ export default function App() {
   }, [user?.id]);
 
   useEffect(() => {
-    // If sharing link, go straight to the relevant tool
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('data')) {
-      setPage('builder');
-    } else if (params.get('sp_data')) {
-      setPage('setpieces');
-    } else if (params.get('ts_data')) {
-      setPage('drills');
-    }
+    const resolvePageFromLocation = (): AppPage => {
+      // If sharing link, go straight to relevant tool.
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('data')) return 'builder';
+      if (params.get('sp_data')) return 'setpieces';
+      if (params.get('ts_data')) return 'drills';
+      return getPageFromPath(window.location.pathname);
+    };
+
+    const initialPage = resolvePageFromLocation();
+    navigateToPage(initialPage, true);
+
+    const onPopState = () => {
+      setPage(resolvePageFromLocation());
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // --- Google Analytics Tracking ---
@@ -189,7 +245,7 @@ export default function App() {
     if (typeof window.gtag === 'function') {
       window.gtag('event', 'page_view', {
         page_title: page.charAt(0).toUpperCase() + page.slice(1),
-        page_location: window.location.origin + '/' + page
+        page_location: window.location.origin + PAGE_PATHS[page]
       });
     }
   }, [page]);
@@ -240,46 +296,46 @@ export default function App() {
       )}
       {page === 'home' && (
         <Home 
-            onStart={() => setPage('builder')} 
-            onNavigate={(p) => setPage(p)}
+            onStart={() => navigateToPage('builder')} 
+            onNavigate={(p) => navigateToPage(p)}
         />
       )}
       {page === 'builder' && (
         <LineupBuilder 
-            onNavigate={(p) => setPage(p)} 
+            onNavigate={(p) => navigateToPage(p)} 
             globalPlayers={players}
             onGlobalPlayersUpdate={handleUpdatePlayers}
         />
       )}
       {page === 'articles' && (
         <Articles 
-            onBack={() => setPage('home')} 
-            onNavigate={(p) => setPage(p)}
+            onBack={() => navigateToPage('home')} 
+            onNavigate={(p) => navigateToPage(p)}
         />
       )}
       {page === 'faq' && (
         <FAQ
-          onBack={() => setPage(lastNonFaqPageRef.current)}
-          onNavigate={(p) => setPage(p)}
+          onBack={() => navigateToPage(lastNonFaqPageRef.current)}
+          onNavigate={(p) => navigateToPage(p)}
         />
       )}
       {page === 'setpieces' && (
         <SetPieces 
-            onNavigate={(p) => setPage(p)} 
+            onNavigate={(p) => navigateToPage(p)} 
             players={players}
             setPlayers={handleUpdatePlayers}
         />
       )}
       {page === 'drills' && (
         <Drills 
-            onNavigate={(p) => setPage(p)} 
+            onNavigate={(p) => navigateToPage(p)} 
             players={players}
             setPlayers={handleUpdatePlayers}
         />
       )}
       {page === 'minutes' && (
         <MinutesLog 
-            onNavigate={(p) => setPage(p)} 
+            onNavigate={(p) => navigateToPage(p)} 
             players={players}
         />
       )}
