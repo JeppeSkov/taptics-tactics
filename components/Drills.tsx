@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { NavMenu } from './NavMenu';
+import { CurrentActivityBanner } from './CurrentActivityBanner';
 import { SquadList } from './SquadList';
 import { Pitch, PitchArrow, PitchGoal, PitchSmallGoal, PitchCone, PitchMannequin, PitchGate, PitchPole, PitchLadder, PitchPlacedPlayer, PitchBall } from './Pitch';
 import { Player, TacticalSlot } from '../types';
@@ -933,6 +934,8 @@ export const Drills: React.FC<DrillsProps> = ({ onNavigate, players: globalPlaye
             </div>
           )}
         </header>
+
+        <CurrentActivityBanner className="mb-3" />
 
         {isSaveModalOpen && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">

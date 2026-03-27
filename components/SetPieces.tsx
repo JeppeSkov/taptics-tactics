@@ -1,6 +1,7 @@
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { NavMenu } from './NavMenu';
+import { CurrentActivityBanner } from './CurrentActivityBanner';
 import { SquadList } from './SquadList';
 import { Pitch, PitchArrow, PitchZone, PitchOpponent } from './Pitch';
 import { SetPieceSharedView, SharedSetPiecePayload } from './SetPieceSharedView';
@@ -1168,6 +1169,8 @@ export const SetPieces: React.FC<SetPiecesProps> = ({
                 </button>
             </div>
           </header>
+
+          <CurrentActivityBanner className="mb-3" />
 
           {/* Content */}
           <div className="flex flex-1 gap-4 overflow-hidden min-h-0">

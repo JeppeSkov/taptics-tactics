@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { NavMenu } from './NavMenu';
+import { CurrentActivityBanner } from './CurrentActivityBanner';
 import { Player, MatchLog, PositionCategory, PlayerMatchStats } from '../types';
 import { MINUTES_STORAGE_KEY } from '../constants';
 import { Clock, Plus, Trash2, Calendar, Check, X, ArrowLeft, ChevronDown, ChevronRight, FolderPlus, Layers, AlertTriangle } from 'lucide-react';
@@ -389,6 +390,8 @@ export const MinutesLog: React.FC<MinutesLogProps> = ({ onNavigate, players }) =
                 </div>
             </header>
 
+            <CurrentActivityBanner className="w-full max-w-[1600px] mb-3" />
+
             <div className="w-full max-w-[1600px] flex flex-col lg:flex-row gap-6 flex-1 min-h-0 overflow-hidden">
                 
                 {/* Main: Season Totals (Expandable List) */}
@@ -586,6 +589,8 @@ export const MinutesLog: React.FC<MinutesLogProps> = ({ onNavigate, players }) =
                 </button>
              </div>
         </header>
+
+        <CurrentActivityBanner className="w-full max-w-7xl mb-3" />
 
         <div className="w-full max-w-7xl bg-slate-800 rounded-lg border border-slate-700 flex flex-col flex-1 min-h-0 overflow-hidden shadow-2xl">
             <div className="p-6 border-b border-slate-700 flex gap-6 items-end bg-slate-850">
