@@ -12,6 +12,13 @@ import { MOCK_PLAYERS, STORAGE_KEY } from './constants';
 import { useAuth } from './supabaseAuth';
 import { fetchPlayersForUser, savePlayersForUser } from './supabasePlayers';
 import { useLivePresenceHeartbeat } from './livePresence';
+import { CookieConsentBanner } from './components/CookieConsentBanner';
+import {
+  loadGoogleAnalytics,
+  getStoredConsent,
+  setStoredConsent,
+  type CookieConsent,
+} from './analytics';
 
 // Add type definition for Google Analytics
 declare global {
@@ -52,6 +59,8 @@ const getPageFromPath = (pathname: string): AppPage => {
 
 export default function App() {
   const [page, setPage] = useState<AppPage>('home');
+  const [cookieConsent, setCookieConsent] = useState<CookieConsent>(() => getStoredConsent());
+  const [gaReady, setGaReady] = useState(false);
   useLivePresenceHeartbeat(page);
   const { user } = useAuth();
   const playersRef = useRef<Player[]>([]);
@@ -242,15 +251,32 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // --- Google Analytics Tracking ---
   useEffect(() => {
-    if (typeof window.gtag === 'function') {
-      window.gtag('event', 'page_view', {
-        page_title: page.charAt(0).toUpperCase() + page.slice(1),
-        page_location: window.location.origin + PAGE_PATHS[page]
-      });
+    if (cookieConsent !== 'accepted') {
+      setGaReady(false);
+      return;
     }
-  }, [page]);
+    let cancelled = false;
+    loadGoogleAnalytics()
+      .then(() => {
+        if (!cancelled) setGaReady(true);
+      })
+      .catch(() => {
+        if (!cancelled) setGaReady(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [cookieConsent]);
+
+  // --- Google Analytics page views (only after consent + script load) ---
+  useEffect(() => {
+    if (!gaReady || typeof window.gtag !== 'function') return;
+    window.gtag('event', 'page_view', {
+      page_title: page.charAt(0).toUpperCase() + page.slice(1),
+      page_location: window.location.origin + PAGE_PATHS[page],
+    });
+  }, [page, gaReady]);
 
   return (
     <>
@@ -339,6 +365,15 @@ export default function App() {
         <MinutesLog 
             onNavigate={(p) => navigateToPage(p)} 
             players={players}
+        />
+      )}
+
+      {cookieConsent === null && (
+        <CookieConsentBanner
+          onChoice={(choice) => {
+            setStoredConsent(choice);
+            setCookieConsent(choice);
+          }}
         />
       )}
     </>

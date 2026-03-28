@@ -9,6 +9,7 @@ import { ScheduleCalendar } from './components/ScheduleCalendar';
 import { CurrentActivityBanner } from './components/CurrentActivityBanner';
 import { Player, TacticalSlot } from './types';
 import { MOCK_PLAYERS, FORMATIONS_11, FORMATIONS_9, FORMATIONS_8, FORMATIONS_7, BENCH_SLOTS, STORAGE_KEY } from './constants';
+import { trackShare } from './analytics';
 import { LayoutGrid, Users, MessageSquare, Calendar, Edit2, Check, X, Plus, Palette, Layers, ClipboardList, Link as LinkIcon, Eye, Shield, Swords, RotateCcw, ChevronLeft, ChevronDown, AlertTriangle, Share2, Copy } from 'lucide-react';
 
 // Unicode-safe Base64 encoding (mirrors SetPieces safeBtoa)
@@ -595,12 +596,22 @@ export const LineupBuilder: React.FC<LineupBuilderProps> = ({
       if (!encoded) throw new Error('Encoding failed');
 
       const url = `${window.location.origin}${window.location.pathname}?data=${encoded}`;
-      
-      navigator.clipboard.writeText(url);
-      setCopyToastMessage('Public lineup link copied to clipboard!');
-      setShowCopyToast(true);
-      setTimeout(() => setShowCopyToast(false), 3000);
-      setIsShareWarningOpen(false);
+
+      void navigator.clipboard
+        .writeText(url)
+        .then(() => {
+          trackShare({ type: 'lineup' });
+          setCopyToastMessage('Public lineup link copied to clipboard!');
+          setShowCopyToast(true);
+          setTimeout(() => setShowCopyToast(false), 3000);
+          setIsShareWarningOpen(false);
+        })
+        .catch(() => {
+          setCopyToastMessage('Could not copy link — try copying from the address bar');
+          setShowCopyToast(true);
+          setTimeout(() => setShowCopyToast(false), 3000);
+          setIsShareWarningOpen(false);
+        });
     } catch (e) {
       // eslint-disable-next-line no-console
       console.error('Failed to generate lineup link', e);
@@ -613,10 +624,19 @@ export const LineupBuilder: React.FC<LineupBuilderProps> = ({
 
   const handleShareBuilder = () => {
     const url = `${window.location.origin}${window.location.pathname}`;
-    navigator.clipboard.writeText(url);
-    setCopyToastMessage('Builder link copied to clipboard!');
-    setShowCopyToast(true);
-    setTimeout(() => setShowCopyToast(false), 3000);
+    void navigator.clipboard
+      .writeText(url)
+      .then(() => {
+        trackShare({ type: 'builder' });
+        setCopyToastMessage('Builder link copied to clipboard!');
+        setShowCopyToast(true);
+        setTimeout(() => setShowCopyToast(false), 3000);
+      })
+      .catch(() => {
+        setCopyToastMessage('Could not copy link — try copying from the address bar');
+        setShowCopyToast(true);
+        setTimeout(() => setShowCopyToast(false), 3000);
+      });
   };
 
   // --- RENDER SHARED VIEW ---

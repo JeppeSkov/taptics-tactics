@@ -211,7 +211,9 @@ interface PitchProps {
   isExport?: boolean;
   viewMode?: 'full' | 'offensive' | 'defensive' | 'penalty';
   playerIconStyle?: 'shirt' | 'circle';
-  isSmallMode?: boolean; 
+  isSmallMode?: boolean;
+  /** When false, player name labels under icons are hidden (Set Pieces). */
+  showPlayerNames?: boolean;
   sport?: 'football' | 'handball';
 }
 
@@ -289,6 +291,7 @@ export const Pitch: React.FC<PitchProps> = ({
   viewMode = 'full',
   playerIconStyle = 'shirt',
   isSmallMode = false,
+  showPlayerNames = true,
   sport: sportProp
 }) => {
   const getPlayerInSlot = (slotId: string) => players.find(p => p.assignedSlot === slotId);
@@ -338,6 +341,40 @@ export const Pitch: React.FC<PitchProps> = ({
   const [drawingArrow, setDrawingArrow] = useState<{ startX: number; startY: number; endX: number; endY: number } | null>(null);
 
   const [zoneResizeState, setZoneResizeState] = useState<{ id: string } | null>(null);
+
+  /** HTML5 drag session (document-level — covers squad list + pitch draggables). */
+  const [html5DragActive, setHtml5DragActive] = useState(false);
+  /** When true, squad-style drags (playerId only) must still hit player slots; other drags pass through. */
+  const [html5PassThroughPlayers, setHtml5PassThroughPlayers] = useState(false);
+
+  useEffect(() => {
+    if (isExport) return;
+    const onDragStart = (e: DragEvent) => {
+      setHtml5DragActive(true);
+      const dt = e.dataTransfer;
+      if (!dt) {
+        setHtml5PassThroughPlayers(true);
+        return;
+      }
+      // getData can be flaky in the same tick as dragstart; defer so squad (playerId-only) vs pitch moves read correctly.
+      queueMicrotask(() => {
+        const playerId = dt.getData('playerId');
+        const slotId = dt.getData('slotId');
+        const isSquadOrBenchDrag = !!playerId && !slotId;
+        setHtml5PassThroughPlayers(!isSquadOrBenchDrag);
+      });
+    };
+    const onDragEnd = () => {
+      setHtml5DragActive(false);
+      setHtml5PassThroughPlayers(false);
+    };
+    document.addEventListener('dragstart', onDragStart);
+    document.addEventListener('dragend', onDragEnd);
+    return () => {
+      document.removeEventListener('dragstart', onDragStart);
+      document.removeEventListener('dragend', onDragEnd);
+    };
+  }, [isExport]);
 
   // Figma-style alignment guides: show when drop snaps to another element's line
   const [alignmentGuides, setAlignmentGuides] = useState<{ vertical?: number; horizontal?: number } | null>(null);
@@ -705,11 +742,13 @@ export const Pitch: React.FC<PitchProps> = ({
   };
 
   const handleZoneDragStart = (e: React.DragEvent, zoneId: string) => {
+      e.dataTransfer.setData('type', 'zone');
       e.dataTransfer.setData('zoneId', zoneId);
       e.stopPropagation();
   };
 
   const handleOpponentDragStart = (e: React.DragEvent, opponentId: string) => {
+      e.dataTransfer.setData('type', 'opponent');
       e.dataTransfer.setData('opponentId', opponentId);
       e.stopPropagation();
   };
@@ -822,24 +861,38 @@ export const Pitch: React.FC<PitchProps> = ({
       const rect = containerRef.current.getBoundingClientRect();
       return { x: Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100)), y: Math.max(0, Math.min(100, ((e.clientY - rect.top) / rect.height) * 100)) };
   };
+  const isPitchUiChrome = (target: EventTarget | null) =>
+    target instanceof Element && target.closest('[data-pitch-no-place]') !== null;
+
   const handlePitchClick = (e: React.MouseEvent) => {
+      if (!containerRef.current) return;
+      if (!containerRef.current.contains(e.target as Node)) return;
+
+      // Click-to-place / draw must work on top of zones, players, and other stacked items (not only the bare pitch div).
+      if (elementPlacementMode && onElementPlace) {
+        if (isPitchUiChrome(e.target)) return;
+        const { x, y } = getPct(e);
+        onElementPlace(x, y);
+        return;
+      }
+      if (placedPlayerDrawingMode && onNewPlacedPlayerDrop) {
+        if (isPitchUiChrome(e.target)) return;
+        const { x, y } = getPct(e);
+        onNewPlacedPlayerDrop(x, y);
+        return;
+      }
+      if (arrowDrawingMode && onNewArrowDrop) {
+        if (isPitchUiChrome(e.target)) return;
+        onPitchBackgroundClick?.();
+        setSelectedArrowId(null);
+        const { x, y } = getPct(e);
+        setDrawingArrow({ startX: x, startY: y, endX: x, endY: y });
+        return;
+      }
+
       if (e.target !== containerRef.current && e.target !== e.currentTarget) return;
-      if (elementPlacementMode && onElementPlace && containerRef.current) {
-          const { x, y } = getPct(e);
-          onElementPlace(x, y);
-          return;
-      }
-      if (placedPlayerDrawingMode && onNewPlacedPlayerDrop && containerRef.current) {
-          const { x, y } = getPct(e);
-          onNewPlacedPlayerDrop(x, y);
-          return;
-      }
       onPitchBackgroundClick?.();
       setSelectedArrowId(null);
-      if (arrowDrawingMode && onNewArrowDrop && containerRef.current) {
-          const { x, y } = getPct(e);
-          setDrawingArrow({ startX: x, startY: y, endX: x, endY: y });
-      }
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
@@ -952,8 +1005,13 @@ export const Pitch: React.FC<PitchProps> = ({
   // w-6 h-6 is 1.5rem (24px). w-7 h-7 is 1.75rem (28px). w-9 h-9 is 2.25rem (36px).
   // 24px is roughly 14% smaller than 28px, fulfilling the 10% smaller request.
   const circleSizeClass = isSmallMode ? 'w-6 h-6 text-[10px]' : 'w-9 h-9 text-sm';
-  const nameTextSize = isExport ? 'text-base font-bold' : (isSmallMode ? 'text-[10px] font-bold' : 'text-xs font-bold');
-  const namePadding = isExport ? 'px-3 py-1' : (isSmallMode ? 'px-1.5 py-0' : 'px-2 py-0.5');
+  /** Lineup: text-xs (~12px). Set pieces: smaller nameplate than lineup. */
+  const nameTextSize = isExport
+    ? 'text-base font-bold'
+    : isSmallMode
+      ? 'text-[9px] font-semibold leading-tight'
+      : 'text-xs font-bold';
+  const namePadding = isExport ? 'px-3 py-1' : isSmallMode ? 'px-1 py-px' : 'px-2 py-0.5';
   
   const aspectRatioClass = viewMode === 'full' ? 'aspect-[5/6]' : viewMode === 'penalty' ? 'aspect-[3/2]' : 'aspect-[5/3]';
 
@@ -962,6 +1020,20 @@ export const Pitch: React.FC<PitchProps> = ({
   const markerSizeBase = isSmallMode ? 3.2 : 4;
   const markerRefXBase = isSmallMode ? 2.5 : 3;
   const markerViewBox = "0 0 4 4";
+
+  /** Hide hover "delete" (X) affordances while any element is being moved (HTML5 or mouse drag). */
+  const suppressDeleteChrome =
+    html5DragActive ||
+    dragState !== null ||
+    equipmentDrag !== null ||
+    drawingArrow !== null ||
+    zoneResizeState !== null;
+  const deleteAffordanceOpacity = suppressDeleteChrome
+    ? 'opacity-0 pointer-events-none'
+    : 'opacity-0 group-hover:opacity-100';
+
+  /** Non-squad HTML5 drags: hit-testing passes through stacked pitch items so `drop` + coords use the pitch (not a zone/cone/player under the cursor). */
+  const stackPointerPassThrough = html5DragActive && html5PassThroughPlayers;
 
   const pitchBgClass = sport === 'handball' ? 'bg-indigo-900' : 'bg-green-700';
   
@@ -1094,7 +1166,7 @@ export const Pitch: React.FC<PitchProps> = ({
           return (
          <div
             key={zone.id}
-            className="absolute transform -translate-x-1/2 -translate-y-1/2 cursor-move z-10 group"
+            className={`absolute transform -translate-x-1/2 -translate-y-1/2 cursor-move z-10 group${stackPointerPassThrough ? ' pointer-events-none' : ''}`}
             style={{
                 left: `${zone.x}%`,
                 top: `${zone.y}%`,
@@ -1110,7 +1182,8 @@ export const Pitch: React.FC<PitchProps> = ({
                  {!isExport && onZoneResize && (
                     <button
                         type="button"
-                        className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-4 h-4 rounded-full bg-yellow-300 border border-yellow-100 shadow-md cursor-ew-resize opacity-0 group-hover:opacity-100 transition-opacity z-50"
+                        data-pitch-no-place
+                        className={`absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-4 h-4 rounded-full bg-yellow-300 border border-yellow-100 shadow-md cursor-ew-resize ${deleteAffordanceOpacity} transition-opacity z-50`}
                         onMouseDown={(e) => handleZoneResizeMouseDown(e, zone.id)}
                         draggable={false}
                         title="Drag to resize"
@@ -1119,7 +1192,8 @@ export const Pitch: React.FC<PitchProps> = ({
              </div>
              {!isExport && onZoneRemove && (
                  <div 
-                     className="absolute top-0 right-0 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity shadow-md z-40 hover:bg-red-600"
+                     data-pitch-no-place
+                     className={`absolute top-0 right-0 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center cursor-pointer ${deleteAffordanceOpacity} transition-opacity shadow-md z-40 hover:bg-red-600`}
                      onClick={(e) => { e.stopPropagation(); onZoneRemove(zone.id); }}
                      title="Remove Zone"
                  >
@@ -1172,7 +1246,7 @@ export const Pitch: React.FC<PitchProps> = ({
             const delY = midY + ny * offsetDist;
 
             return (
-                <g key={arrow.id} className="pointer-events-auto">
+                <g key={arrow.id} className={stackPointerPassThrough ? 'pointer-events-none' : 'pointer-events-auto'}>
                     <line 
                         x1={arrow.startX} y1={arrow.startY} x2={arrow.endX} y2={arrow.endY} 
                         stroke="transparent" 
@@ -1204,11 +1278,13 @@ export const Pitch: React.FC<PitchProps> = ({
                                 className="cursor-move hover:fill-red-500 transition-colors"
                                 onMouseDown={(e) => handleArrowMouseDown(e, arrow.id, 'end')}
                             />
-                            <g className="cursor-pointer hover:opacity-80 transition-opacity" onClick={(e) => handleArrowDelete(e, arrow.id)}>
+                            {!suppressDeleteChrome && (
+                            <g data-pitch-no-place className="cursor-pointer hover:opacity-80 transition-opacity" onClick={(e) => handleArrowDelete(e, arrow.id)}>
                                 <circle cx={delX} cy={delY} r="1.5" fill="#ef4444" stroke="white" strokeWidth="0.5" />
                                 <line x1={delX - 0.75} y1={delY - 0.75} x2={delX + 0.75} y2={delY + 0.75} stroke="white" strokeWidth="0.5" strokeLinecap="round" />
                                 <line x1={delX + 0.75} y1={delY - 0.75} x2={delX - 0.75} y2={delY + 0.75} stroke="white" strokeWidth="0.5" strokeLinecap="round" />
                             </g>
+                            )}
                         </>
                     )}
                 </g>
@@ -1220,7 +1296,7 @@ export const Pitch: React.FC<PitchProps> = ({
       {opponents.map((opponent) => (
          <div
             key={opponent.id}
-            className="absolute transform -translate-x-1/2 -translate-y-1/2 cursor-move z-10 group"
+            className={`absolute transform -translate-x-1/2 -translate-y-1/2 cursor-move z-10 group${stackPointerPassThrough ? ' pointer-events-none' : ''}`}
             style={{ left: `${opponent.x}%`, top: `${opponent.y}%` }}
             draggable={!isExport}
             onDragStart={(e) => handleOpponentDragStart(e, opponent.id)}
@@ -1232,7 +1308,8 @@ export const Pitch: React.FC<PitchProps> = ({
              {/* Delete Opponent */}
              {!isExport && onOpponentRemove && (
                  <div 
-                     className="absolute -top-2 -right-2 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity shadow-md z-40 hover:bg-red-600"
+                     data-pitch-no-place
+                     className={`absolute -top-2 -right-2 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center cursor-pointer ${deleteAffordanceOpacity} transition-opacity shadow-md z-40 hover:bg-red-600`}
                      onClick={(e) => { e.stopPropagation(); onOpponentRemove(opponent.id); }}
                      title="Remove Opponent"
                  >
@@ -1246,7 +1323,7 @@ export const Pitch: React.FC<PitchProps> = ({
       {goals.map((goal) => (
          <div
             key={goal.id}
-            className="absolute cursor-move z-10 group"
+            className={`absolute cursor-move z-10 group${stackPointerPassThrough ? ' pointer-events-none' : ''}`}
             style={{
               left: `${goal.x}%`,
               top: `${goal.y}%`,
@@ -1267,7 +1344,8 @@ export const Pitch: React.FC<PitchProps> = ({
              </div>
              {!isExport && onGoalRemove && (
                  <div 
-                     className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity shadow-md z-40 hover:bg-red-600"
+                     data-pitch-no-place
+                     className={`absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center cursor-pointer ${deleteAffordanceOpacity} transition-opacity shadow-md z-40 hover:bg-red-600`}
                      onClick={(e) => { e.stopPropagation(); onGoalRemove(goal.id); }}
                      title="Remove Goal"
                  >
@@ -1281,7 +1359,7 @@ export const Pitch: React.FC<PitchProps> = ({
       {smallGoals.map((sg) => (
          <div
             key={sg.id}
-            className="absolute cursor-move z-10 group"
+            className={`absolute cursor-move z-10 group${stackPointerPassThrough ? ' pointer-events-none' : ''}`}
             style={{
               left: `${sg.x}%`,
               top: `${sg.y}%`,
@@ -1301,7 +1379,8 @@ export const Pitch: React.FC<PitchProps> = ({
              </div>
              {!isExport && onSmallGoalRemove && (
                  <div 
-                     className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full flex items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity shadow-md z-40 hover:bg-red-600"
+                     data-pitch-no-place
+                     className={`absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full flex items-center justify-center cursor-pointer ${deleteAffordanceOpacity} transition-opacity shadow-md z-40 hover:bg-red-600`}
                      onClick={(e) => { e.stopPropagation(); onSmallGoalRemove(sg.id); }}
                      title="Remove Small Goal"
                  >
@@ -1313,23 +1392,23 @@ export const Pitch: React.FC<PitchProps> = ({
 
       {/* --- CONES (coaching equipment) --- */}
       {cones.map((c) => (
-        <div key={c.id} className="absolute cursor-move z-10 group" style={{ left: `${c.x}%`, top: `${c.y}%`, transform: `translate(-50%, -50%) scale(${scaleVal(c.size)})` }} draggable={!isExport} onDragStart={(e) => handleConeDragStart(e, c.id)} onClick={(e) => { e.stopPropagation(); onElementClick?.('cone', c.id); }}>
+        <div key={c.id} className={`absolute cursor-move z-10 group${stackPointerPassThrough ? ' pointer-events-none' : ''}`} style={{ left: `${c.x}%`, top: `${c.y}%`, transform: `translate(-50%, -50%) scale(${scaleVal(c.size)})` }} draggable={!isExport} onDragStart={(e) => handleConeDragStart(e, c.id)} onClick={(e) => { e.stopPropagation(); onElementClick?.('cone', c.id); }}>
           <div className="w-4 h-5 bg-amber-400 border border-amber-600 shadow-md" style={{ clipPath: 'polygon(50% 0%, 100% 100%, 0% 100%)' }} />
           {!isExport && onConeRemove && (
-            <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full flex items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity z-40 hover:bg-red-600" onClick={(e) => { e.stopPropagation(); onConeRemove(c.id); }} title="Remove cone"><X size={6} className="text-white" /></div>
+            <div data-pitch-no-place className={`absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full flex items-center justify-center cursor-pointer ${deleteAffordanceOpacity} transition-opacity z-40 hover:bg-red-600`} onClick={(e) => { e.stopPropagation(); onConeRemove(c.id); }} title="Remove cone"><X size={6} className="text-white" /></div>
           )}
         </div>
       ))}
 
       {/* --- MANNEQUINS --- */}
       {mannequins.map((m) => (
-        <div key={m.id} className="absolute cursor-move z-10 group" style={{ left: `${m.x}%`, top: `${m.y}%`, transform: `translate(-50%, -50%) scale(${scaleVal(m.size)})` }} draggable={!isExport} onDragStart={(e) => handleMannequinDragStart(e, m.id)} onClick={(e) => { e.stopPropagation(); onElementClick?.('mannequin', m.id); }}>
+        <div key={m.id} className={`absolute cursor-move z-10 group${stackPointerPassThrough ? ' pointer-events-none' : ''}`} style={{ left: `${m.x}%`, top: `${m.y}%`, transform: `translate(-50%, -50%) scale(${scaleVal(m.size)})` }} draggable={!isExport} onDragStart={(e) => handleMannequinDragStart(e, m.id)} onClick={(e) => { e.stopPropagation(); onElementClick?.('mannequin', m.id); }}>
           <div className="w-5 h-8 rounded-sm bg-slate-600 border-2 border-slate-500 shadow-lg flex flex-col items-center justify-end pb-0.5">
             <div className="w-4 h-3 rounded-full bg-slate-500 -mb-1" />
             <div className="w-3 h-4 bg-slate-500 rounded-sm" />
           </div>
           {!isExport && onMannequinRemove && (
-            <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full flex items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity z-40 hover:bg-red-600" onClick={(e) => { e.stopPropagation(); onMannequinRemove(m.id); }} title="Remove mannequin"><X size={6} className="text-white" /></div>
+            <div data-pitch-no-place className={`absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full flex items-center justify-center cursor-pointer ${deleteAffordanceOpacity} transition-opacity z-40 hover:bg-red-600`} onClick={(e) => { e.stopPropagation(); onMannequinRemove(m.id); }} title="Remove mannequin"><X size={6} className="text-white" /></div>
           )}
         </div>
       ))}
@@ -1338,7 +1417,7 @@ export const Pitch: React.FC<PitchProps> = ({
       {gates.map((g) => (
         <div
           key={g.id}
-          className="absolute cursor-move z-10 group"
+          className={`absolute cursor-move z-10 group${stackPointerPassThrough ? ' pointer-events-none' : ''}`}
           style={{ left: `${g.x}%`, top: `${g.y}%`, transform: `translate(-50%, -50%) scale(${scaleVal(g.size)})` }}
           onMouseDown={(e) => handleEquipmentMouseDown(e, 'gate', g.id)}
           onClick={(e) => { e.stopPropagation(); onElementClick?.('gate', g.id); }}
@@ -1354,17 +1433,17 @@ export const Pitch: React.FC<PitchProps> = ({
           </div>
           </div>
           {!isExport && onGateRemove && (
-            <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full flex items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity z-40 hover:bg-red-600" onClick={(e) => { e.stopPropagation(); onGateRemove(g.id); }} title="Remove gate"><X size={6} className="text-white" /></div>
+            <div data-pitch-no-place className={`absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full flex items-center justify-center cursor-pointer ${deleteAffordanceOpacity} transition-opacity z-40 hover:bg-red-600`} onClick={(e) => { e.stopPropagation(); onGateRemove(g.id); }} title="Remove gate"><X size={6} className="text-white" /></div>
           )}
         </div>
       ))}
 
       {/* --- POLES --- */}
       {poles.map((p) => (
-        <div key={p.id} className="absolute cursor-move z-10 group" style={{ left: `${p.x}%`, top: `${p.y}%`, transform: `translate(-50%, -50%) scale(${scaleVal(p.size)})` }} draggable={!isExport} onDragStart={(e) => handlePoleDragStart(e, p.id)} onClick={(e) => { e.stopPropagation(); onElementClick?.('pole', p.id); }}>
+        <div key={p.id} className={`absolute cursor-move z-10 group${stackPointerPassThrough ? ' pointer-events-none' : ''}`} style={{ left: `${p.x}%`, top: `${p.y}%`, transform: `translate(-50%, -50%) scale(${scaleVal(p.size)})` }} draggable={!isExport} onDragStart={(e) => handlePoleDragStart(e, p.id)} onClick={(e) => { e.stopPropagation(); onElementClick?.('pole', p.id); }}>
           <div className="w-1.5 h-6 bg-white border border-slate-300 rounded shadow" />
           {!isExport && onPoleRemove && (
-            <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full flex items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity z-40 hover:bg-red-600" onClick={(e) => { e.stopPropagation(); onPoleRemove(p.id); }} title="Remove pole"><X size={6} className="text-white" /></div>
+            <div data-pitch-no-place className={`absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full flex items-center justify-center cursor-pointer ${deleteAffordanceOpacity} transition-opacity z-40 hover:bg-red-600`} onClick={(e) => { e.stopPropagation(); onPoleRemove(p.id); }} title="Remove pole"><X size={6} className="text-white" /></div>
           )}
         </div>
       ))}
@@ -1373,7 +1452,7 @@ export const Pitch: React.FC<PitchProps> = ({
       {ladders.map((l) => (
         <div
           key={l.id}
-          className="absolute cursor-move z-10 group"
+          className={`absolute cursor-move z-10 group${stackPointerPassThrough ? ' pointer-events-none' : ''}`}
           style={{
             left: `${l.x}%`,
             top: `${l.y}%`,
@@ -1391,7 +1470,7 @@ export const Pitch: React.FC<PitchProps> = ({
             ))}
           </div>
           {!isExport && onLadderRemove && (
-            <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full flex items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity z-40 hover:bg-red-600" onClick={(e) => { e.stopPropagation(); onLadderRemove(l.id); }} title="Remove ladder"><X size={6} className="text-white" /></div>
+            <div data-pitch-no-place className={`absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full flex items-center justify-center cursor-pointer ${deleteAffordanceOpacity} transition-opacity z-40 hover:bg-red-600`} onClick={(e) => { e.stopPropagation(); onLadderRemove(l.id); }} title="Remove ladder"><X size={6} className="text-white" /></div>
           )}
         </div>
       ))}
@@ -1400,7 +1479,7 @@ export const Pitch: React.FC<PitchProps> = ({
       {placedPlayers.map((p) => (
         <div
           key={p.id}
-          className="absolute cursor-move z-10 group"
+          className={`absolute cursor-move z-10 group${stackPointerPassThrough ? ' pointer-events-none' : ''}`}
           style={{ left: `${p.x}%`, top: `${p.y}%`, transform: `translate(-50%, -50%) scale(${scaleVal(p.size)})` }}
           draggable={!isExport}
           onDragStart={(e) => handlePlacedPlayerDragStart(e, p.id)}
@@ -1412,7 +1491,8 @@ export const Pitch: React.FC<PitchProps> = ({
           />
           {!isExport && onPlacedPlayerRemove && (
             <div
-              className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full flex items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity z-40 hover:bg-red-600"
+              data-pitch-no-place
+              className={`absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full flex items-center justify-center cursor-pointer ${deleteAffordanceOpacity} transition-opacity z-40 hover:bg-red-600`}
               onClick={(e) => { e.stopPropagation(); onPlacedPlayerRemove(p.id); }}
               title="Remove player"
             >
@@ -1426,7 +1506,7 @@ export const Pitch: React.FC<PitchProps> = ({
       {balls.map((b) => (
         <div
           key={b.id}
-          className="absolute cursor-move z-30 group"
+          className={`absolute cursor-move z-[25] group${stackPointerPassThrough ? ' pointer-events-none' : ''}`}
           style={{ left: `${b.x}%`, top: `${b.y}%`, transform: `translate(-50%, -50%) scale(${scaleVal(b.size)})` }}
           draggable={!isExport}
           onDragStart={(e) => { e.dataTransfer.setData('type', 'ball-multi'); e.dataTransfer.setData('ballId', b.id); e.stopPropagation(); }}
@@ -1435,7 +1515,8 @@ export const Pitch: React.FC<PitchProps> = ({
           <div className="text-xl drop-shadow-md hover:scale-110 transition-transform">⚽</div>
           {!isExport && onBallRemoveById && (
             <div 
-              className="absolute -top-3 -right-3 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity shadow-md z-40 hover:bg-red-600"
+              data-pitch-no-place
+              className={`absolute -top-3 -right-3 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center cursor-pointer ${deleteAffordanceOpacity} transition-opacity shadow-md z-40 hover:bg-red-600`}
               onClick={(e) => { e.stopPropagation(); onBallRemoveById(b.id); }}
               title="Remove ball"
             >
@@ -1448,7 +1529,7 @@ export const Pitch: React.FC<PitchProps> = ({
       {/* --- LEGACY SINGLE BALL (Set Pieces etc.) --- */}
       {ballPosition && (
         <div
-          className="absolute cursor-move z-30 group"
+          className={`absolute cursor-move z-[25] group${stackPointerPassThrough ? ' pointer-events-none' : ''}`}
           style={{ left: `${ballPosition.x}%`, top: `${ballPosition.y}%`, transform: `translate(-50%, -50%) scale(${scaleVal(ballPosition.size)})` }}
           draggable={!isExport}
           onDragStart={(e) => { e.dataTransfer.setData('type', 'ball'); e.stopPropagation(); }}
@@ -1457,7 +1538,8 @@ export const Pitch: React.FC<PitchProps> = ({
            <div className="text-xl drop-shadow-md hover:scale-110 transition-transform">⚽</div>
            {!isExport && onBallRemove && (
                <div 
-                   className="absolute -top-3 -right-3 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity shadow-md z-40 hover:bg-red-600"
+                   data-pitch-no-place
+                   className={`absolute -top-3 -right-3 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center cursor-pointer ${deleteAffordanceOpacity} transition-opacity shadow-md z-40 hover:bg-red-600`}
                    onClick={(e) => { e.stopPropagation(); onBallRemove(); }}
                    title="Remove ball"
                >
@@ -1493,16 +1575,21 @@ export const Pitch: React.FC<PitchProps> = ({
         return (
           <div
             key={slot.id}
-            className={`absolute transform -translate-x-1/2 -translate-y-1/2 ${slotContainerClass} flex flex-col items-center justify-center transition-all hover:scale-105 z-10 cursor-move`}
+            className={`absolute transform -translate-x-1/2 -translate-y-1/2 ${slotContainerClass} flex flex-col items-center justify-center transition-all z-50 cursor-move ${suppressDeleteChrome ? '' : 'hover:scale-105'} ${stackPointerPassThrough ? 'pointer-events-none' : ''}`}
             style={{ left: `${slot.x}%`, top: `${slot.y}%` }}
             draggable={!isExport}
             onDragStart={(e) => handleDragStart(e, slot.id, player?.id)}
             onDragOver={handleDragOver}
             onDrop={(e) => handleDropOnSlot(e, slot.id)}
-            onMouseDown={(e) => e.stopPropagation()} 
+            onMouseDown={(e) => {
+              if (!elementPlacementMode && !placedPlayerDrawingMode && !arrowDrawingMode) {
+                e.stopPropagation();
+              }
+            }}
           >
             {player ? (
-              <div className="flex flex-col items-center group">
+              /* inline-flex + absolute name: pitch (x,y) stays centered on the icon, not icon+name */
+              <div className="relative inline-flex flex-col items-center group">
                 {playerIconStyle === 'shirt' ? (
                   <div className="relative pointer-events-none">
                     <Shirt 
@@ -1522,7 +1609,7 @@ export const Pitch: React.FC<PitchProps> = ({
                 ) : (
                   <div className="relative">
                     <div 
-                        className={`${circleSizeClass} rounded-full flex items-center justify-center shadow-lg border-2 font-black z-10 transition-transform group-hover:scale-110 relative`}
+                        className={`${circleSizeClass} rounded-full flex items-center justify-center shadow-lg border-2 font-black z-10 transition-transform relative ${suppressDeleteChrome ? '' : 'group-hover:scale-110'}`}
                         style={{ 
                             backgroundColor: kitColor, 
                             color: numberColor, 
@@ -1533,7 +1620,9 @@ export const Pitch: React.FC<PitchProps> = ({
                     </div>
                     {onRemovePlayer && (
                         <button 
-                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-md z-20 hover:bg-red-600"
+                            type="button"
+                            data-pitch-no-place
+                            className={`absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-0.5 ${deleteAffordanceOpacity} transition-opacity shadow-md z-20 hover:bg-red-600`}
                             onClick={(e) => { e.stopPropagation(); onRemovePlayer(player.id); }}
                             title="Remove from pitch"
                         >
@@ -1542,12 +1631,14 @@ export const Pitch: React.FC<PitchProps> = ({
                     )}
                   </div>
                 )}
-                
-                {/* Conditionally render name only if NOT in small mode (Set Pieces) */}
-                {!isSmallMode && (
-                  <div className={`mt-0.5 bg-slate-900 text-white ${nameTextSize} ${namePadding} rounded shadow-lg border ${nameBorderClass} whitespace-nowrap z-20 pointer-events-none`}>
-                    {player.name}
-                  </div>
+                {showPlayerNames && (
+                <div
+                  className={`absolute top-full left-1/2 mt-0.5 -translate-x-1/2 bg-slate-900 text-white ${nameTextSize} ${namePadding} rounded shadow-lg border ${nameBorderClass} z-30 pointer-events-none text-center ${
+                    isSmallMode ? 'max-w-[5.5rem] truncate' : 'whitespace-nowrap'
+                  }`}
+                >
+                  {player.name}
+                </div>
                 )}
               </div>
             ) : (

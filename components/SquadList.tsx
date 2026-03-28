@@ -20,6 +20,8 @@ interface SquadListProps {
   onUpdatePlayerStatus: (playerId: string, newStatus: string) => void;
   onAddPlayer: (slotId: string) => void;
   customStatusConfig?: StatusOption[]; // New prop for custom statuses (roles)
+  /** Set Pieces: open-hand grab on Pos / Name / Info; Role column keeps the dropdown cursor. */
+  grabCursorMode?: boolean;
 }
 
 export const SquadList: React.FC<SquadListProps> = ({ 
@@ -32,8 +34,9 @@ export const SquadList: React.FC<SquadListProps> = ({
     onUpdatePlayerName,
     onUpdatePlayerNumber,
     onUpdatePlayerStatus,
-    onAddPlayer,
-    customStatusConfig
+  onAddPlayer,
+  customStatusConfig,
+  grabCursorMode = false,
 }) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingNumberId, setEditingNumberId] = useState<string | null>(null);
@@ -98,24 +101,37 @@ export const SquadList: React.FC<SquadListProps> = ({
       }
   };
 
+  const dragGrabClass = 'cursor-grab active:cursor-grabbing';
+
   // Helper to render a player row content, shared between standard slots and reserves
   const renderPlayerContent = (player: Player | undefined, positionLabel: string, slotId?: string) => {
+      const showGrab = !!player;
+      const posColGrab = grabCursorMode && showGrab ? dragGrabClass : '';
+      const numberClass = grabCursorMode
+        ? 'bg-slate-700 text-slate-300 w-4 h-4 flex items-center justify-center rounded text-[9px] font-bold shrink-0 hover:bg-slate-600 hover:text-white transition-colors cursor-grab'
+        : 'bg-slate-700 text-slate-300 w-4 h-4 flex items-center justify-center rounded text-[9px] font-bold shrink-0 cursor-pointer hover:bg-slate-600 hover:text-white transition-colors';
+      const nameSpanClass = grabCursorMode
+        ? `font-medium truncate cursor-grab hover:text-emerald-400 transition-colors select-none w-full block text-xs ${!player?.name ? 'text-slate-500 italic' : 'text-slate-200'}`
+        : `font-medium truncate cursor-text hover:text-emerald-400 transition-colors select-none w-full block text-xs ${!player?.name ? 'text-slate-500 italic' : 'text-slate-200'}`;
+
       return (
         <>
             {/* COL 1: Position */}
-            <div className="w-8 flex-shrink-0 font-bold text-slate-500 flex flex-col justify-center leading-tight text-[10px]">
+            <div
+              className={`w-8 flex-shrink-0 font-bold text-slate-500 flex items-center leading-tight text-[10px] ${posColGrab}`}
+            >
                 <span className="text-slate-300 pl-1">{positionLabel}</span>
             </div>
 
-            {/* COL 2: Name (Editable, Draggable) */}
-            <div className="flex-grow flex items-center gap-2 border-r border-slate-700/50 pr-2 mr-2 overflow-hidden">
+            {/* COL 2: Name — whole column is the drag handle (not only grip/number/name text) */}
+            <div
+              className={`flex-grow min-w-0 flex items-center gap-2 border-r border-slate-700/50 pr-2 mr-2 overflow-hidden ${showGrab ? dragGrabClass : ''}`}
+              draggable={!!player && !editingId && editingNumberId !== player.id}
+              onDragStart={player ? (e) => handleDragStart(e, player.id) : undefined}
+            >
                 {player ? (
-                    <div 
-                        className="flex items-center gap-2 w-full overflow-hidden"
-                        draggable={!editingId}
-                        onDragStart={(e) => handleDragStart(e, player.id)}
-                    >
-                        <div className="cursor-move text-slate-600 hover:text-slate-400 shrink-0">
+                    <div className="flex items-center gap-2 w-full min-h-[1.75rem] overflow-hidden">
+                        <div className="text-slate-600 group-hover:text-slate-400 shrink-0 pointer-events-none" aria-hidden>
                             <GripVertical size={12} />
                         </div>
                         
@@ -141,7 +157,7 @@ export const SquadList: React.FC<SquadListProps> = ({
                             />
                         ) : (
                             <div 
-                                className="bg-slate-700 text-slate-300 w-4 h-4 flex items-center justify-center rounded text-[9px] font-bold shrink-0 cursor-pointer hover:bg-slate-600 hover:text-white transition-colors"
+                                className={numberClass}
                                 onClick={() => setEditingNumberId(player.id)}
                                 title="Click to edit number"
                             >
@@ -162,7 +178,7 @@ export const SquadList: React.FC<SquadListProps> = ({
                             />
                         ) : (
                             <span 
-                                className={`font-medium truncate cursor-text hover:text-emerald-400 transition-colors select-none w-full block text-xs ${!player.name ? 'text-slate-500 italic' : 'text-slate-200'}`}
+                                className={nameSpanClass}
                                 onDoubleClick={() => setEditingId(player.id)}
                                 title="Double click to edit name"
                             >
@@ -172,6 +188,7 @@ export const SquadList: React.FC<SquadListProps> = ({
                     </div>
                 ) : (
                     <button 
+                        type="button"
                         onClick={() => slotId && onAddPlayer(slotId)}
                         className="text-slate-600 italic text-[10px] ml-6 hover:text-emerald-400 hover:underline bg-transparent border-none cursor-pointer flex items-center gap-1 transition-colors outline-none"
                     >
@@ -180,8 +197,10 @@ export const SquadList: React.FC<SquadListProps> = ({
                 )}
             </div>
 
-            {/* COL 3: Status/Role (Dropdown) */}
-            <div className="w-24 flex-shrink-0 flex items-center justify-center border-r border-slate-700/50 pr-2 mr-2">
+            {/* COL 3: Status/Role (Dropdown) — not a drag handle; keep default / pointer for the select */}
+            <div
+              className={`w-24 flex-shrink-0 flex items-center justify-center border-r border-slate-700/50 pr-2 mr-2 ${grabCursorMode ? 'cursor-default' : ''}`}
+            >
                 {player ? (
                     <select 
                         className={`bg-transparent text-[10px] font-bold outline-none cursor-pointer ${getStatusColor(player.status)}`}
@@ -208,15 +227,17 @@ export const SquadList: React.FC<SquadListProps> = ({
 
             {/* COL 4: Info */}
             {player && (
-                <div className="flex items-center justify-center w-6 flex-shrink-0">
-                    <Info size={12} className="text-slate-600 hover:text-slate-400 cursor-pointer" />
+                <div
+                  className={`flex items-center justify-center w-6 flex-shrink-0 ${grabCursorMode ? dragGrabClass : ''}`}
+                >
+                    <Info size={12} className={`text-slate-600 hover:text-slate-400 ${grabCursorMode ? '' : 'cursor-pointer'}`} />
                 </div>
             )}
         </>
       );
   };
 
-  const rowClass = "group flex items-center border-b border-slate-700/50 bg-slate-800/40 hover:bg-slate-700/50 transition-colors h-8 px-2";
+  const rowClass = "group flex items-stretch min-h-[2rem] border-b border-slate-700/50 bg-slate-800/40 hover:bg-slate-700/50 transition-colors px-2";
 
   const renderRow = (slotId: string, label?: string, isSub: boolean = false) => {
     const player = getPlayerInSlot(slotId);
@@ -249,7 +270,7 @@ export const SquadList: React.FC<SquadListProps> = ({
   };
 
   const renderAvailableRow = (player: Player) => {
-    const availableRowClass = "group flex items-center border-b border-slate-700/50 bg-slate-800/20 hover:bg-slate-700/30 transition-colors h-8 px-2";
+    const availableRowClass = "group flex items-stretch min-h-[2rem] border-b border-slate-700/50 bg-slate-800/20 hover:bg-slate-700/30 transition-colors px-2";
     return (
         <div key={player.id} className={availableRowClass}>
             {renderPlayerContent(player, "AVL")}
@@ -258,7 +279,7 @@ export const SquadList: React.FC<SquadListProps> = ({
   };
 
   const renderInjuredRow = (player: Player) => {
-    const injuredRowClass = "group flex items-center border-b border-slate-700/50 bg-yellow-900/10 hover:bg-yellow-900/20 transition-colors h-8 px-2";
+    const injuredRowClass = "group flex items-stretch min-h-[2rem] border-b border-slate-700/50 bg-yellow-900/10 hover:bg-yellow-900/20 transition-colors px-2";
     return (
         <div key={player.id} className={injuredRowClass}>
             {renderPlayerContent(player, "INJ")}

@@ -32,6 +32,7 @@ interface SharedRoutineData {
         opponents: PitchOpponent[];
         notes: string;
         plan?: string;
+        showPlayerNamesOnPitch?: boolean;
     };
 }
 
@@ -160,6 +161,7 @@ export const SetPieceSharedView: React.FC<SetPieceSharedViewProps> = ({ payload,
                                             viewMode={routine.scenario}
                                             playerIconStyle="circle"
                                             isSmallMode={true} // Cleaner look for smaller view
+                                            showPlayerNames={routine.data.showPlayerNamesOnPitch !== false}
                                         />
                                     </div>
                                 </div>

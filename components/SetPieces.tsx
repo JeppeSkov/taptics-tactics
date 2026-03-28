@@ -9,7 +9,8 @@ import { Player, TacticalSlot } from '../types';
 import { STORAGE_KEY } from '../constants';
 import { useAuth } from '../supabaseAuth';
 import { fetchSetPiecesForUser, saveSetPiecesForUser } from '../supabaseSetPieces';
-import { Flag, Users, Trash2, Palette, ChevronDown, CornerUpRight, Shield, MoveRight, User, CircleDashed, ClipboardEdit, Save, Play, Clock, Layout, X, AlertTriangle, Check, RefreshCw, Plus, Share2, Copy, Link as LinkIcon, ZoomIn, ZoomOut, Eye, Send, Undo2 } from 'lucide-react';
+import { trackShare } from '../analytics';
+import { Flag, Users, Trash2, Palette, ChevronDown, CornerUpRight, Shield, MoveRight, User, CircleDashed, ClipboardEdit, Save, Play, Clock, Layout, X, AlertTriangle, Check, RefreshCw, Plus, Share2, Copy, Link as LinkIcon, ZoomIn, ZoomOut, Eye, EyeOff, Send, Undo2 } from 'lucide-react';
 
 interface SetPiecesProps {
   onNavigate: (page: 'home' | 'builder' | 'setpieces' | 'articles' | 'minutes' | 'drills' | 'faq') => void;
@@ -59,6 +60,8 @@ interface ScenarioData {
     opponents: PitchOpponent[];
     notes: string;
     plan?: string;
+    /** When false, player names are hidden on the pitch (shared preview uses this too). */
+    showPlayerNamesOnPitch?: boolean;
 }
 
 export interface SavedRoutine {
@@ -82,6 +85,7 @@ type SetPiecesSnapshot = {
   opponents: PitchOpponent[];
   notes: string;
   plan: string;
+  showPlayerNamesOnPitch: boolean;
 };
 
 // Unicode-safe Base64 encoding
@@ -160,8 +164,8 @@ export const SetPieces: React.FC<SetPiecesProps> = ({
   const savedKitColor = savedState?.setPiecesKitColor;
 
   const initialScenariosData = savedSetPieces || {
-      offensive: { slots: [], assignments: {}, roles: {}, ballPosition: null, arrows: [], zones: [], opponents: [], notes: '', plan: '' },
-      defensive: { slots: [], assignments: {}, roles: {}, ballPosition: null, arrows: [], zones: [], opponents: [], notes: '', plan: '' }
+      offensive: { slots: [], assignments: {}, roles: {}, ballPosition: null, arrows: [], zones: [], opponents: [], notes: '', plan: '', showPlayerNamesOnPitch: true },
+      defensive: { slots: [], assignments: {}, roles: {}, ballPosition: null, arrows: [], zones: [], opponents: [], notes: '', plan: '', showPlayerNamesOnPitch: true }
   };
   
   // Active Data for initialization
@@ -182,6 +186,7 @@ export const SetPieces: React.FC<SetPiecesProps> = ({
   const [opponents, setOpponents] = useState<PitchOpponent[]>(activeData.opponents || []);
   const [notes, setNotes] = useState<string>(activeData.notes || '');
   const [plan, setPlan] = useState<string>(activeData.plan || '');
+  const [showPlayerNamesOnPitch, setShowPlayerNamesOnPitch] = useState<boolean>(activeData.showPlayerNamesOnPitch !== false);
   const [currentAssignments, setCurrentAssignments] = useState<Record<string, string>>(activeData.assignments || {});
   const [currentRoles, setCurrentRoles] = useState<Record<string, string>>(activeData.roles || {});
 
@@ -202,7 +207,7 @@ export const SetPieces: React.FC<SetPiecesProps> = ({
   const [saveName, setSaveName] = useState('');
   
   // Local UI State (not persisted)
-  const [pitchSize, setPitchSize] = useState(500); // px width
+  const [pitchSize, setPitchSize] = useState(750); // px width (default ~50% larger than prior 500)
   const [arrowToolActive, setArrowToolActive] = useState<false | 'solid' | 'dashed'>(false);
   type PlacementElement = 'ball' | 'zone' | 'opponent';
   const [placementElement, setPlacementElement] = useState<PlacementElement | null>(null);
@@ -222,7 +227,8 @@ export const SetPieces: React.FC<SetPiecesProps> = ({
     opponents: opponents.map(o => ({ ...o })),
     notes,
     plan,
-  }), [slots, currentAssignments, currentRoles, ballPosition, arrows, zones, opponents, notes, plan]);
+    showPlayerNamesOnPitch,
+  }), [slots, currentAssignments, currentRoles, ballPosition, arrows, zones, opponents, notes, plan, showPlayerNamesOnPitch]);
 
   const pushHistory = useCallback(() => {
     setHistory(prev => [...prev.slice(1 - MAX_UNDO), takeSnapshot()]);
@@ -257,6 +263,7 @@ export const SetPieces: React.FC<SetPiecesProps> = ({
     setOpponents(s.opponents);
     setNotes(s.notes);
     setPlan(s.plan);
+    setShowPlayerNamesOnPitch(s.showPlayerNamesOnPitch !== false);
     setHistory(prev => prev.slice(0, -1));
   }, [history.length]);
 
@@ -277,8 +284,8 @@ export const SetPieces: React.FC<SetPiecesProps> = ({
       appliedRemoteSetPiecesRef.current = user.id;
 
       const emptyScenarios: Record<ScenarioType, ScenarioData> = {
-        offensive: { slots: [], assignments: {}, roles: {}, ballPosition: null, arrows: [], zones: [], opponents: [], notes: '', plan: '' },
-        defensive: { slots: [], assignments: {}, roles: {}, ballPosition: null, arrows: [], zones: [], opponents: [], notes: '', plan: '' },
+        offensive: { slots: [], assignments: {}, roles: {}, ballPosition: null, arrows: [], zones: [], opponents: [], notes: '', plan: '', showPlayerNamesOnPitch: true },
+        defensive: { slots: [], assignments: {}, roles: {}, ballPosition: null, arrows: [], zones: [], opponents: [], notes: '', plan: '', showPlayerNamesOnPitch: true },
       };
       setScenariosData(data ?? emptyScenarios);
       setScenario(scenarioKey);
@@ -294,6 +301,7 @@ export const SetPieces: React.FC<SetPiecesProps> = ({
         setOpponents(current.opponents ?? []);
         setNotes(current.notes ?? '');
         setPlan(current.plan ?? '');
+        setShowPlayerNamesOnPitch(current.showPlayerNamesOnPitch !== false);
       }
 
       try {
@@ -343,7 +351,8 @@ export const SetPieces: React.FC<SetPiecesProps> = ({
         zones,
         opponents,
         notes,
-        plan
+        plan,
+        showPlayerNamesOnPitch,
     };
 
     // Update the master data object
@@ -379,7 +388,7 @@ export const SetPieces: React.FC<SetPiecesProps> = ({
         console.error("Failed to save set pieces", e);
     }
   }, [
-      slots, currentAssignments, currentRoles, ballPosition, arrows, zones, opponents, notes, plan,
+      slots, currentAssignments, currentRoles, ballPosition, arrows, zones, opponents, notes, plan, showPlayerNamesOnPitch,
       scenario, scenariosData, kitColor, savedRoutines, isSharedMode, user?.id
   ]);
 
@@ -401,7 +410,8 @@ export const SetPieces: React.FC<SetPiecesProps> = ({
               zones,
               opponents,
               notes,
-              plan
+              plan,
+              showPlayerNamesOnPitch,
           }
       };
       
@@ -420,6 +430,7 @@ export const SetPieces: React.FC<SetPiecesProps> = ({
       setOpponents(targetData.opponents || []);
       setNotes(targetData.notes || '');
       setPlan(targetData.plan || '');
+      setShowPlayerNamesOnPitch(targetData.showPlayerNamesOnPitch !== false);
   };
 
   const handleNewPlayerDrop = (playerId: string, x: number, y: number) => {
@@ -561,6 +572,7 @@ export const SetPieces: React.FC<SetPiecesProps> = ({
     }
     if (placementElement === 'zone') {
       handleNewZoneDrop(x, y);
+      setPlacementElement(null);
       return;
     }
     if (placementElement === 'opponent') {
@@ -631,7 +643,8 @@ export const SetPieces: React.FC<SetPiecesProps> = ({
                       zones,
                       opponents,
                       notes,
-                      plan
+                      plan,
+                      showPlayerNamesOnPitch,
                   }
               };
           }
@@ -662,7 +675,8 @@ export const SetPieces: React.FC<SetPiecesProps> = ({
               zones,
               opponents,
               notes,
-              plan
+              plan,
+              showPlayerNamesOnPitch,
           },
           createdAt: Date.now()
       };
@@ -694,13 +708,14 @@ export const SetPieces: React.FC<SetPiecesProps> = ({
       setOpponents(data.opponents || []);
       setNotes(data.notes || '');
       setPlan(data.plan || '');
+      setShowPlayerNamesOnPitch(data.showPlayerNamesOnPitch !== false);
       
       setLoadedRoutineId(routine.id); // Mark as loaded
 
       // We also need to update the background scenariosData object so if we switch tabs immediately it's synced
       setScenariosData(prev => ({
           ...prev,
-          [routine.scenario]: data
+          [routine.scenario]: { ...data, showPlayerNamesOnPitch: data.showPlayerNamesOnPitch !== false }
       }));
 
       showToast(`Loaded "${routine.name}"`);
@@ -737,7 +752,8 @@ export const SetPieces: React.FC<SetPiecesProps> = ({
               zones,
               opponents,
               notes,
-              plan
+              plan,
+              showPlayerNamesOnPitch,
           }
       };
 
@@ -791,7 +807,8 @@ export const SetPieces: React.FC<SetPiecesProps> = ({
                   zones,
                   opponents,
                   notes,
-                  plan
+                  plan,
+                  showPlayerNamesOnPitch,
               },
               createdAt: Date.now()
           }];
@@ -827,9 +844,16 @@ export const SetPieces: React.FC<SetPiecesProps> = ({
           if (!encoded) throw new Error("Encoding failed");
           
           const url = `${window.location.origin}${window.location.pathname}?sp_data=${encoded}`;
-          
-          navigator.clipboard.writeText(url);
-          showToast(mode === 'single' ? "Set piece link copied!" : "Playbook link copied!");
+
+          void navigator.clipboard
+            .writeText(url)
+            .then(() => {
+              trackShare({ type: 'set_pieces', share_mode: mode });
+              showToast(mode === 'single' ? 'Set piece link copied!' : 'Playbook link copied!');
+            })
+            .catch(() => {
+              showToast('Could not copy link — try copying from the address bar');
+            });
       } catch (e) {
           console.error("Failed to generate link", e);
           showToast("Error generating link");
@@ -1198,6 +1222,7 @@ export const SetPieces: React.FC<SetPiecesProps> = ({
                         onUpdatePlayerStatus={handleUpdatePlayerStatus}
                         onAddPlayer={handleAddPlayer}
                         customStatusConfig={SET_PIECE_ROLES} // Pass custom roles
+                        grabCursorMode
                     />
                     
                     {/* Coach Notes */}
@@ -1243,6 +1268,15 @@ export const SetPieces: React.FC<SetPiecesProps> = ({
                         >
                             Reset
                         </button>
+                         <button
+                            type="button"
+                            onClick={() => setShowPlayerNamesOnPitch((v) => !v)}
+                            className="px-2 py-1 bg-slate-800 text-[10px] font-bold text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg border border-slate-600 shadow-lg mt-1 flex items-center justify-center gap-1"
+                            title={showPlayerNamesOnPitch ? 'Hide player names on the pitch' : 'Show player names on the pitch'}
+                        >
+                            {showPlayerNamesOnPitch ? <Eye size={14} className="text-slate-300" /> : <EyeOff size={14} className="text-slate-500" />}
+                            <span>Names</span>
+                        </button>
                      </div>
 
                      <div 
@@ -1287,6 +1321,7 @@ export const SetPieces: React.FC<SetPiecesProps> = ({
                             viewMode={scenario}
                             playerIconStyle="circle" // Use circle icons
                             isSmallMode={true} // Enable smaller 20% icons for Set Pieces
+                            showPlayerNames={showPlayerNamesOnPitch}
                         />
                         
                         {slots.length === 0 && !ballPosition && arrows.length === 0 && (
@@ -1371,7 +1406,7 @@ export const SetPieces: React.FC<SetPiecesProps> = ({
                                             ? 'bg-emerald-600/30 border-emerald-500 text-emerald-200 ring-2 ring-emerald-500/70'
                                             : 'bg-slate-900 hover:bg-slate-700 text-slate-300 border-slate-600 hover:border-emerald-500/50 hover:text-white'
                                         }`}
-                                        title={placementElement === 'ball' ? 'Ball — click pitch to place (click again to turn off)' : 'Ball — click then click pitch to place'}
+                                        title={placementElement === 'ball' ? 'Ball — click pitch to place (one ball; click Ball again to move)' : 'Ball — click pitch to place one ball (click Ball again to reposition)'}
                                     >
                                         <span className="text-2xl leading-none drop-shadow-md">⚽</span>
                                     </button>
@@ -1420,7 +1455,7 @@ export const SetPieces: React.FC<SetPiecesProps> = ({
                                             ? 'bg-emerald-600/30 border-emerald-500 text-emerald-200 ring-2 ring-emerald-500/70'
                                             : 'bg-slate-900 hover:bg-slate-700 text-slate-300 border-slate-600 hover:border-emerald-500/50 hover:text-white'
                                         }`}
-                                        title={placementElement === 'zone' ? 'Target zone — click pitch to place (click again to turn off)' : 'Target zone — click then click pitch to place'}
+                                        title={placementElement === 'zone' ? 'Target zone — click pitch to place (one zone; click Zone again for another)' : 'Target zone — click pitch to place one zone (click Zone again for another)'}
                                     >
                                         <CircleDashed size={24} className="text-yellow-400" />
                                     </button>
