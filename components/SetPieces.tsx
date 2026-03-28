@@ -70,6 +70,8 @@ export interface SavedRoutine {
 }
 
 const MAX_UNDO = 50;
+/** Max number of set piece routines stored locally (and synced when logged in). */
+const MAX_SAVED_ROUTINES = 10;
 type SetPiecesSnapshot = {
   slots: TacticalSlot[];
   assignments: Record<string, string>;
@@ -602,8 +604,8 @@ export const SetPieces: React.FC<SetPiecesProps> = ({
           setIsSaveModalOpen(true);
       } else {
           // If no routine is loaded, we act as creating a new one
-          if (savedRoutines.length >= 5) {
-              alert("You can only save up to 5 routines. Please delete one to save a new one.");
+          if (savedRoutines.length >= MAX_SAVED_ROUTINES) {
+              alert(`You can only save up to ${MAX_SAVED_ROUTINES} routines. Please delete one to save a new one.`);
               return;
           }
           setSaveName('');
@@ -642,7 +644,7 @@ export const SetPieces: React.FC<SetPiecesProps> = ({
 
   const handleSaveNewRoutine = () => {
       if (!saveName.trim()) return;
-      if (savedRoutines.length >= 5) {
+      if (savedRoutines.length >= MAX_SAVED_ROUTINES) {
           alert("Limit reached. Cannot save as new.");
           return;
       }
@@ -667,7 +669,7 @@ export const SetPieces: React.FC<SetPiecesProps> = ({
 
       // Update state immediately
       setSavedRoutines(prev => {
-          const updated = [newRoutine, ...prev].slice(0, 5);
+          const updated = [newRoutine, ...prev].slice(0, MAX_SAVED_ROUTINES);
           return updated;
       });
       
@@ -1007,9 +1009,9 @@ export const SetPieces: React.FC<SetPiecesProps> = ({
                              {/* Save as New Button (Only if space allows) */}
                              <button 
                                 onClick={handleSaveNewRoutine}
-                                disabled={!saveName.trim() || savedRoutines.length >= 5}
+                                disabled={!saveName.trim() || savedRoutines.length >= MAX_SAVED_ROUTINES}
                                 className="flex-1 px-3 py-2 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-bold rounded-lg transition-colors flex items-center justify-center gap-1"
-                                title={savedRoutines.length >= 5 ? "Max 5 routines allowed" : "Save as copy"}
+                                title={savedRoutines.length >= MAX_SAVED_ROUTINES ? `Max ${MAX_SAVED_ROUTINES} routines allowed` : "Save as copy"}
                              >
                                 <Plus size={14} /> New
                              </button>
@@ -1098,11 +1100,11 @@ export const SetPieces: React.FC<SetPiecesProps> = ({
                 <button 
                     onClick={handleSaveClick}
                     className={`px-3 py-1.5 rounded text-sm font-bold shadow transition-colors flex items-center gap-2 border ${
-                        savedRoutines.length >= 5 && !loadedRoutineId
+                        savedRoutines.length >= MAX_SAVED_ROUTINES && !loadedRoutineId
                         ? 'bg-slate-800 text-slate-500 border-slate-700 cursor-not-allowed opacity-75' 
                         : 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-500'
                     }`}
-                    title={savedRoutines.length >= 5 && !loadedRoutineId ? "Max 5 routines allowed" : "Save Routine"}
+                    title={savedRoutines.length >= MAX_SAVED_ROUTINES && !loadedRoutineId ? `Max ${MAX_SAVED_ROUTINES} routines allowed` : "Save Routine"}
                 >
                     <Save size={16} />
                     <span className="hidden sm:inline">{loadedRoutineId ? 'Update/add new' : 'Save'}</span>
@@ -1300,7 +1302,7 @@ export const SetPieces: React.FC<SetPiecesProps> = ({
                      <div className="w-full max-w-[500px] bg-slate-800/80 border border-slate-700 rounded-lg p-4 order-2 lg:order-1">
                         <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
                             <span>Saved Routines</span>
-                            <span className="text-[10px] bg-slate-700 px-1.5 py-0.5 rounded text-white">{savedRoutines.length}/5</span>
+                            <span className="text-[10px] bg-slate-700 px-1.5 py-0.5 rounded text-white">{savedRoutines.length}/{MAX_SAVED_ROUTINES}</span>
                             <div className="h-px bg-slate-700 flex-grow"></div>
                         </h3>
                         
@@ -1378,7 +1380,11 @@ export const SetPieces: React.FC<SetPiecesProps> = ({
                                 <div className="flex flex-col items-center gap-1">
                                     <button
                                         type="button"
-                                        onClick={() => setArrowToolActive(prev => prev === 'solid' ? false : 'solid')}
+                                        onClick={() => {
+                                          setPlacementElement(null);
+                                          setSelectedArrowId(null);
+                                          setArrowToolActive(prev => prev === 'solid' ? false : 'solid');
+                                        }}
                                         className={`w-12 h-12 rounded-lg flex items-center justify-center border transition-all shrink-0 ${arrowToolActive === 'solid' ? 'bg-emerald-600/30 border-emerald-500 text-emerald-200 ring-2 ring-emerald-500/70' : 'bg-slate-900 hover:bg-slate-700 text-slate-300 border-slate-600 cursor-grab active:cursor-grabbing hover:border-emerald-500/50 hover:text-white'}`}
                                         title={arrowToolActive === 'solid' ? 'Run arrow — click again to turn off' : 'Arrow (run) — drag or draw'}
                                     >
@@ -1389,7 +1395,11 @@ export const SetPieces: React.FC<SetPiecesProps> = ({
                                 <div className="flex flex-col items-center gap-1">
                                     <button
                                         type="button"
-                                        onClick={() => setArrowToolActive(prev => prev === 'dashed' ? false : 'dashed')}
+                                        onClick={() => {
+                                          setPlacementElement(null);
+                                          setSelectedArrowId(null);
+                                          setArrowToolActive(prev => prev === 'dashed' ? false : 'dashed');
+                                        }}
                                         className={`w-12 h-12 rounded-lg flex items-center justify-center border transition-all shrink-0 ${arrowToolActive === 'dashed' ? 'bg-emerald-600/30 border-emerald-500 text-emerald-200 ring-2 ring-emerald-500/70' : 'bg-slate-900 hover:bg-slate-700 text-slate-300 border-slate-600 cursor-grab active:cursor-grabbing hover:border-emerald-500/50 hover:text-white'}`}
                                         title={arrowToolActive === 'dashed' ? 'Pass — click again to turn off' : 'Pass (dotted) — drag or draw'}
                                     >

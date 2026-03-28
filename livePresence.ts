@@ -136,7 +136,7 @@ export const useOtherActiveCoaches = () => {
 
 export const buildActivityText = (otherCoaches: number) => {
   if (otherCoaches === 0) {
-    return 'No other coaches active right now — share this builder to a coach you respect.';
+    return 'No other coaches active right now — Share this builder with a coach you respect.';
   }
   return `${otherCoaches} other coach${otherCoaches === 1 ? '' : 'es'} currently active on Taptics Squad.`;
 };
